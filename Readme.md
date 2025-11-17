@@ -11,43 +11,97 @@ dotnet --list-runtimes
 After downloading `Coolprop.dll`, `CoolpropWrapper.dll` and `CoolpropWrapper.xll` (and `CoolPropWrapper.dna` for the portable version), place the three (four) files **together** in the directory of your choice. Finally import in Excel the `.xll` file via: File (Archivo) -> Options (Opciones) -> Addins (Complementos) -> Import (Ir...) -> Browse... (Examinar...) and select the `.xll` file.
 
 ## Usage
-CoolPropWrapper allows you to compute thermodynamic properties of real fluids and humid air using CoolProp in Excel. The primary functions available are:
+CoolPropWrapper allows you to compute thermodynamic properties of real fluids and humid air using CoolProp in Excel. The functions are available in two variants:
 
-### `TMPr(output, name1, value1, name2, value2, fluid)`
-- Computes thermodynamic properties of real fluids.
+- **Engineering Units** (default): Temperature in °C, Pressure in bar, Energy in kJ/kg, etc.
+- **SI Units**: Temperature in K, Pressure in Pa, Energy in J/kg, etc.
+
+### Real Fluid Functions
+
+#### `CProp(output, name1, value1, name2, value2, fluid)` or `CProp_E(...)`
+- Computes thermodynamic properties of real fluids using **engineering units**.
 - **Units used:**
   - Temperature: **Celsius (°C)** (converted internally to Kelvin (K))
   - Pressure: **bar** (converted internally to Pascal (Pa))
   - Enthalpy, Internal Energy, Entropy: **kJ/kg** (converted internally to J/kg)
   - Specific Heat: **kJ/kg/K** (converted internally to J/kg/K)
 
+#### `CProp_SI(output, name1, value1, name2, value2, fluid)`
+- Computes thermodynamic properties of real fluids using **SI units** (no conversion).
+- **Units used:**
+  - Temperature: **Kelvin (K)**
+  - Pressure: **Pascal (Pa)**
+  - Enthalpy, Internal Energy, Entropy: **J/kg**
+  - Specific Heat: **J/kg/K**
+
 ### Example Usage:
 ```excel
-=TMPr("H", "T", 25, "P", 1.01325, "Water")
+=CProp("H", "T", 25, "P", 1.01325, "Water")
 ```
 This will return the enthalpy (H) of water at **25°C** and **1.01325 bar**.
+
+For SI units:
+```excel
+=CProp_SI("H", "T", 298.15, "P", 101325, "Water")
+```
+This will return the enthalpy (H) of water at **298.15 K** and **101325 Pa** in J/kg.
 
 It can be used in a parametric way for convenience and efficient calculations. This allows for modular approaches, being able to reuse part of the calculations, drag the formulas, etc.
 
 For example using:
 ```excel
-=TMPr(E1,B1,B2,C1,C2,A2)
+=CProp(E1,B1,B2,C1,C2,A2)
 ```
 ![Parametric usage](https://github.com/Danisaski/dafer-tmpr/blob/main/imgs/screenshot.png)
 
-### `TMPa(output, name1, value1, name2, value2, name3, value3)`
-- Computes thermodynamic properties of humid air.
+### Humid Air Functions
+
+#### `CPropHA(output, name1, value1, name2, value2, name3, value3)` or `CPropHA_E(...)`
+- Computes thermodynamic properties of humid air using **engineering units**.
 - **Units used:**
   - Temperature: **Celsius (°C)** (converted internally to Kelvin (K))
   - Pressure: **bar** (converted internally to Pascal (Pa))
   - Enthalpy, Specific Heat, Entropy: **kJ/kg** (converted internally to J/kg)
   - Humidity Ratio: **kg_water/kg_dry_air**
 
+#### `CPropHA_SI(output, name1, value1, name2, value2, name3, value3)`
+- Computes thermodynamic properties of humid air using **SI units** (no conversion).
+- **Units used:**
+  - Temperature: **Kelvin (K)**
+  - Pressure: **Pascal (Pa)**
+  - Enthalpy, Specific Heat, Entropy: **J/kg**
+  - Humidity Ratio: **kg_water/kg_dry_air**
+
 ### Example Usage:
 ```excel
-=TMPa("W", "T", 25, "P", 1.01325, "RH", 0.5)
+=CPropHA("W", "T", 25, "P", 1.01325, "RH", 0.5)
 ```
 This will return the humidity ratio (W) for air at **25°C**, **1.01325 bar**, and **50% relative humidity**.
+
+For SI units:
+```excel
+=CPropHA_SI("W", "T", 298.15, "P", 101325, "R", 0.5)
+```
+This will return the humidity ratio (W) for air at **298.15 K**, **101325 Pa**, and **50% relative humidity**.
+
+### Diagnostic Function
+
+#### `CPropDiag()`
+- Diagnostic function to check CoolProp DLL loading paths.
+- Returns information about where the add-in is searching for `CoolProp.dll` and whether it was found.
+- Useful for troubleshooting installation issues.
+
+### Function Summary
+
+| **Function** | **Description**                 | **Units**                    |
+| ------------ | ------------------------------- | ---------------------------- |
+| `CProp`      | Real fluid properties (default) | Engineering (°C, bar, kJ/kg) |
+| `CProp_E`    | Real fluid properties           | Engineering (°C, bar, kJ/kg) |
+| `CProp_SI`   | Real fluid properties           | SI (K, Pa, J/kg)             |
+| `CPropHA`    | Humid air properties (default)  | Engineering (°C, bar, kJ/kg) |
+| `CPropHA_E`  | Humid air properties            | Engineering (°C, bar, kJ/kg) |
+| `CPropHA_SI` | Humid air properties            | SI (K, Pa, J/kg)             |
+| `CPropDiag`  | Diagnostic tool                 | N/A                          |
 
 ### Available Properties and Aliases
 

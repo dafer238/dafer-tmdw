@@ -71,7 +71,7 @@ public static class CoolPropWrapper
 
     // Diagnostic function to help troubleshoot DLL loading
     [ExcelFunction(Description = "Diagnostic function to check CoolProp DLL loading paths")]
-    public static object TMPdiag()
+    public static object CPropDiag()
     {
         try
         {
@@ -276,9 +276,55 @@ public static class CoolPropWrapper
         return Marshal.PtrToStringAnsi(ptr) ?? "Unknown error";
     }
 
-    // Function to calculate thermodynamic properties
-    [ExcelFunction(Description = "Calculate thermodynamic properties of real fluids using CoolProp with engineering units.")]
-    public static object TMPr(string output, string name1, object value1, string name2, object value2, string fluid)
+    // Function to calculate thermodynamic properties using SI units (no conversion)
+    [ExcelFunction(Description = "Calculate thermodynamic properties of real fluids using CoolProp with SI units (K, Pa, J/kg, etc.).")]
+    public static object CProp_SI(string output, string name1, object value1, string name2, object value2, string fluid)
+    {
+        // Check for missing or invalid inputs
+        if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
+        if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
+        if (value1 == null || !(value1 is double)) return "Error: First property value is missing or not a number.";
+        if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
+        if (value2 == null || !(value2 is double)) return "Error: Second property value is missing or not a number.";
+        if (string.IsNullOrWhiteSpace(fluid)) return "Error: Fluid name is missing.";
+
+        // Normalize parameter names
+        name1 = FormatName(name1);
+        name2 = FormatName(name2);
+        output = FormatName(output);
+
+        // Call CoolProp directly with SI units (no conversion)
+        double result;
+        try
+        {
+            result = PropsSI(output, name1, (double)value1, name2, (double)value2, fluid);
+
+            // Check if the result is a large number (potential error)
+            if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+            {
+                return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
+            }
+        }
+        catch (DllNotFoundException ex)
+        {
+            return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+        }
+        catch (EntryPointNotFoundException ex)
+        {
+            return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            return $"Error: Exception occurred while computing property. {ex.Message}";
+        }
+
+        // Return result in SI units (no conversion)
+        return result;
+    }
+
+    // Function to calculate thermodynamic properties using engineering units
+    [ExcelFunction(Description = "Calculate thermodynamic properties of real fluids using CoolProp with engineering units (°C, bar, kJ/kg, etc.).")]
+    public static object CProp_E(string output, string name1, object value1, string name2, object value2, string fluid)
     {
         // Check for missing or invalid inputs
         if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
@@ -311,7 +357,7 @@ public static class CoolPropWrapper
         }
         catch (DllNotFoundException ex)
         {
-            return $"Error: CoolProp.dll not found in any search path. Use TMPdiag() function to see paths checked. {ex.Message}";
+            return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
         }
         catch (EntryPointNotFoundException ex)
         {
@@ -326,9 +372,63 @@ public static class CoolPropWrapper
         return ConvertFromSI(output, result);
     }
 
+    // Default function (uses engineering units)
+    [ExcelFunction(Description = "Calculate thermodynamic properties of real fluids using CoolProp with engineering units (°C, bar, kJ/kg, etc.). Alias for CProp_E.")]
+    public static object CProp(string output, string name1, object value1, string name2, object value2, string fluid)
+    {
+        return CProp_E(output, name1, value1, name2, value2, fluid);
+    }
 
-[ExcelFunction(Description = "Calculate thermodynamic properties of humid air using CoolProp with engineering units.")]
-public static object TMPa(string output, string name1, object value1, string name2, object value2, string name3, object value3)
+
+[ExcelFunction(Description = "Calculate thermodynamic properties of humid air using CoolProp with SI units (K, Pa, J/kg, etc.).")]
+public static object CPropHA_SI(string output, string name1, object value1, string name2, object value2, string name3, object value3)
+{
+    // Check for missing or invalid inputs
+    if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
+    if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
+    if (value1 == null || !(value1 is double)) return "Error: First property value is missing or not a number.";
+    if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
+    if (value2 == null || !(value2 is double)) return "Error: Second property value is missing or not a number.";
+    if (string.IsNullOrWhiteSpace(name3)) return "Error: Third property name is missing.";
+    if (value3 == null || !(value3 is double)) return "Error: Third property value is missing or not a number.";
+
+    // Normalize parameter names
+    name1 = FormatName_HA(name1);
+    name2 = FormatName_HA(name2);
+    name3 = FormatName_HA(name3);
+    output = FormatName_HA(output);
+
+    // Call CoolProp directly with SI units (no conversion)
+    double result;
+    try
+    {
+        result = HAPropsSI(output, name1, (double)value1, name2, (double)value2, name3, (double)value3);
+
+        // Check if the result is a large number (potential error)
+        if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+        {
+            return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
+        }
+    }
+    catch (DllNotFoundException ex)
+    {
+        return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+    }
+    catch (EntryPointNotFoundException ex)
+    {
+        return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+    }
+    catch (Exception ex)
+    {
+        return $"Error: Exception occurred while computing property. {ex.Message}";
+    }
+
+    // Return result in SI units (no conversion)
+    return result;
+}
+
+[ExcelFunction(Description = "Calculate thermodynamic properties of humid air using CoolProp with engineering units (°C, bar, kJ/kg, etc.).")]
+public static object CPropHA_E(string output, string name1, object value1, string name2, object value2, string name3, object value3)
 {
     // Check for missing or invalid inputs
     if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
@@ -364,7 +464,7 @@ public static object TMPa(string output, string name1, object value1, string nam
     }
     catch (DllNotFoundException ex)
     {
-        return $"Error: CoolProp.dll not found in any search path. Use TMPdiag() function to see paths checked. {ex.Message}";
+        return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
     }
     catch (EntryPointNotFoundException ex)
     {
@@ -377,6 +477,13 @@ public static object TMPa(string output, string name1, object value1, string nam
 
     // Convert output to engineering units
     return ConvertFromSI_HA(output, result);
+    }
+
+    // Default function (uses engineering units)
+    [ExcelFunction(Description = "Calculate thermodynamic properties of humid air using CoolProp with engineering units (°C, bar, kJ/kg, etc.). Alias for CPropHA_E.")]
+    public static object CPropHA(string output, string name1, object value1, string name2, object value2, string name3, object value3)
+    {
+        return CPropHA_E(output, name1, value1, name2, value2, name3, value3);
     }
 
 
