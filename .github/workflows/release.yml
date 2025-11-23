@@ -1,0 +1,75 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="dev"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create ZIP archive for .NET Framework 4.8
+        run: |
+          cd compiled/net48
+          zip -r ../../CoolPropWrapper-net48-x64.zip *
+          cd ../..
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## CoolPropWrapper for Excel - Release ${{ steps.get_version.outputs.VERSION }}
+
+            ### Installation
+
+            Download **CoolPropWrapper-net48-x64.zip** and extract all files to a folder of your choice.
+
+            Import the `.xll` file in Excel via:
+            **File → Options → Add-ins → Go... → Browse...** and select the `.xll` file.
+
+            ### Files Included
+            - `CoolProp.dll` - CoolProp library
+            - `CoolPropWrapper.dll` - Wrapper library
+            - `CoolPropWrapper.dna` - ExcelDNA configuration
+            - `CoolPropWrapper.xll` - Excel Add-in
+
+            ### Requirements
+            - .NET Framework 4.8 (64-bit)
+            - Microsoft Excel (64-bit version recommended)
+
+            ### What's Changed
+            See commits for details.
+
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./CoolPropWrapper-net48-x64.zip
+          asset_name: CoolPropWrapper-net48-x64.zip
+          asset_content_type: application/zip
