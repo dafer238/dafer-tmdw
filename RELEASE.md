@@ -5,12 +5,14 @@ This document explains how to build the project locally and create releases on G
 ## Building Locally
 
 ### Prerequisites
+
 - .NET SDK installed (check with `dotnet --version`)
 - Windows operating system
 
 ### Build Steps
 
 1. Run the build script:
+
    ```cmd
    build.bat
    ```
@@ -50,6 +52,7 @@ git push origin v0.1.1
 ### Step 3: Automatic Release
 
 Once you push the tag, GitHub Actions will automatically:
+
 1. Detect the version tag
 2. Package the files from `compiled/net48/` into a ZIP archive
 3. Create a GitHub release with the version number
@@ -77,14 +80,20 @@ Within a few minutes, a new release will appear at:
 ## Manual Release Trigger
 
 You can also trigger a release manually from the GitHub Actions tab:
+
 1. Go to the repository on GitHub
 2. Click on "Actions"
 3. Select "Create Release" workflow
 4. Click "Run workflow"
+5. Enter the tag name (e.g., `v0.1.3`) in the input field
+6. Click "Run workflow" to confirm
+
+**Note:** The tag you specify will be created if it doesn't already exist. Make sure you've committed your built files to `compiled/net48/` before triggering the manual release.
 
 ## Version Numbering
 
 Follow semantic versioning:
+
 - **v0.1.0** - Initial release
 - **v0.1.1** - Patch (bug fixes)
 - **v0.2.0** - Minor (new features, backwards compatible)
@@ -93,14 +102,17 @@ Follow semantic versioning:
 ## Troubleshooting
 
 ### Build fails
+
 - Ensure .NET SDK is installed
 - Run `dotnet restore` manually to check for package issues
 
 ### Release not created
+
 - Verify the tag follows the format `vX.Y.Z` (e.g., `v0.1.1`)
 - Check GitHub Actions tab for workflow errors
 - Ensure `compiled/net48/` contains all required files
 
 ### Files missing in compiled folder
+
 - The `compiled/` folder is tracked in git (not in `.gitignore`)
 - Commit and push changes in `compiled/net48/` before tagging
