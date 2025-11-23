@@ -152,24 +152,47 @@ For more details on available properties and fluids, refer to the [CoolProp docu
 
 ## If building from source:
 
-Restore packages from the `.csproj`
+### Quick Build (Windows)
+
+Run the build script:
+
+```cmd
+build.bat
+```
+
+The script will:
+
+- Restore packages
+- Build the project for .NET Framework 4.8 (x64)
+- Copy all files to `compiled/net48/`
+
+### Manual Build
+
+Navigate to the source directory:
+
+```bash
+cd src
+```
+
+Restore packages:
 
 ```bash
 dotnet restore
 ```
 
-Build release
+Build release:
 
 ```bash
-dotnet build -c Release
+dotnet build -c Release -p:Platform=x64
 ```
 
-Move the output files:
+The output files will be in `src/bin/x64/Release/net48/`:
 
-```bash
-.\bin\Release\net6.0-windows\publish\CoolPropWrapper64-packed.xll
-.\bin\Release\net6.0-windows\CoolPropWrapper.dll
-.\CoolProp.dll
-```
+- `CoolPropWrapper.dll`
+- `CoolPropWrapper64.xll` (or `CoolPropWrapper.xll`)
+- `CoolPropWrapper64.dna` (or `CoolPropWrapper.dna`)
+- `CoolProp.dll`
 
-Import in Excel the `.xll` file.
+Import the `.xll` file in Excel.
+
+For more details on building and releasing, see `RELEASE.md`.

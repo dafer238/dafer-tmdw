@@ -2,6 +2,30 @@
 
 This document explains how to build the project locally and create releases on GitHub.
 
+## Project Structure
+
+```
+dafer-tmdw/
+├── src/                      # Source code
+│   ├── CoolPropWrapper.cs    # Main wrapper code
+│   ├── CoolPropWrapper.csproj # Project file
+│   ├── CoolPropWrapper.dna   # ExcelDNA configuration
+│   ├── CoolProp.dll          # CoolProp library dependency
+│   ├── bin/                  # Build output (ignored by git)
+│   └── obj/                  # Build artifacts (ignored by git)
+├── compiled/                 # Release-ready files (tracked in git)
+│   └── net48/               # .NET Framework 4.8 build
+│       ├── CoolProp.dll
+│       ├── CoolPropWrapper.dll
+│       ├── CoolPropWrapper.dna
+│       └── CoolPropWrapper.xll
+├── .github/workflows/        # GitHub Actions workflows
+│   └── release.yml          # Automated release workflow
+├── build.bat                # Build script
+├── README.md                # Main documentation
+└── RELEASE.md               # This file
+```
+
 ## Building Locally
 
 ### Prerequisites
