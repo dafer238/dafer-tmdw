@@ -2,13 +2,9 @@
 
 ## Installation
 
-[Latest release](https://github.com/Danisaski/dafer-tmpr/releases) is available for a portable standalone version. If you are **not sure which .NET distribution is installed in your machine**, if any at all, **[download](https://github.com/Danisaski/dafer-tmpr/releases/tag/v0.1.3) the portable rolling release version**. If you have .NET SDK installed you could check which version to download via:
+[The latest release](https://github.com/Danisaski/dafer-tmpr/releases) is available for a portable standalone version.
 
-```bash
-dotnet --list-runtimes
-```
-
-After downloading, extract the zip file with the contents; `Coolprop.dll`, `CoolpropWrapper.dll` and `CoolpropWrapper.xll` (and `CoolPropWrapper.dna` for the portable version), place the three (four) files **together** in the directory of your choice. Finally import in Excel the `.xll` file via: File (Archivo) -> Options (Opciones) -> Addins (Complementos) -> Import (Ir...) -> Browse... (Examinar...) and select the `.xll` file.
+After downloading, extract the zip file with the contents; `Coolprop.dll`, `CoolpropWrapper.dll`, `CoolpropWrapper.xll` and `CoolPropWrapper.dna`, place the four files **together** in the directory of your choice. Finally import in Excel the `.xll` file via: File (Archivo) -> Options (Opciones) -> Addins (Complementos) -> Import (Ir...) -> Browse... (Examinar...) and select the `.xll` file.
 
 ## Usage
 
