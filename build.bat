@@ -61,33 +61,47 @@ if not exist "compiled\net48" mkdir "compiled\net48"
 
 REM Copy files to compiled\net48
 echo.
-echo Copying files to compiled\net48...
+echo Copying 64-bit files to compiled\net48...
 
+REM Copy the main DLL (always the same regardless of bitness)
 copy /Y "bin\x64\Release\net48\CoolPropWrapper.dll" "compiled\net48\" >nul
-copy /Y "bin\x64\Release\net48\CoolPropWrapper.dna" "compiled\net48\" >nul
 copy /Y "CoolProp.dll" "compiled\net48\" >nul
 
-REM Find and copy the best .xll file available
-set XLL_COPIED=0
+REM Copy .dna file - prioritize 64-bit version and rename to remove '64' suffix
+set DNA_COPIED=0
+if exist "bin\x64\Release\net48\CoolPropWrapper64.dna" (
+    echo Copying CoolPropWrapper64.dna as CoolPropWrapper.dna...
+    copy /Y "bin\x64\Release\net48\CoolPropWrapper64.dna" "compiled\net48\CoolPropWrapper.dna" >nul
+    set DNA_COPIED=1
+)
+if !DNA_COPIED! == 0 (
+    if exist "bin\x64\Release\net48\CoolPropWrapper.dna" (
+        echo Copying CoolPropWrapper.dna...
+        copy /Y "bin\x64\Release\net48\CoolPropWrapper.dna" "compiled\net48\" >nul
+        set DNA_COPIED=1
+    )
+)
 
+REM Copy .xll file - prioritize 64-bit version and rename to remove '64' suffix
+set XLL_COPIED=0
 if exist "bin\x64\Release\net48\CoolPropWrapper64.xll" (
     echo Copying CoolPropWrapper64.xll as CoolPropWrapper.xll...
     copy /Y "bin\x64\Release\net48\CoolPropWrapper64.xll" "compiled\net48\CoolPropWrapper.xll" >nul
     set XLL_COPIED=1
 )
-
-if exist "bin\x64\Release\net48\CoolPropWrapper.xll" (
-    if !XLL_COPIED! == 0 (
+if !XLL_COPIED! == 0 (
+    if exist "bin\x64\Release\net48\CoolPropWrapper.xll" (
         echo Copying CoolPropWrapper.xll...
         copy /Y "bin\x64\Release\net48\CoolPropWrapper.xll" "compiled\net48\CoolPropWrapper.xll" >nul
         set XLL_COPIED=1
     )
 )
-
-if exist "bin\x64\Release\net48\publish\CoolPropWrapper-packed.xll" (
-    echo Found packed version, using that instead...
-    copy /Y "bin\x64\Release\net48\publish\CoolPropWrapper-packed.xll" "compiled\net48\CoolPropWrapper.xll" >nul
-    set XLL_COPIED=1
+if !XLL_COPIED! == 0 (
+    if exist "bin\x64\Release\net48\publish\CoolPropWrapper-packed.xll" (
+        echo Found packed version, using that instead...
+        copy /Y "bin\x64\Release\net48\publish\CoolPropWrapper-packed.xll" "compiled\net48\CoolPropWrapper.xll" >nul
+        set XLL_COPIED=1
+    )
 )
 
 if !XLL_COPIED! == 0 (
