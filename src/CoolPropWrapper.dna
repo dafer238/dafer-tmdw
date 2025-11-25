@@ -1,4 +1,4 @@
 <DnaLibrary Name="CoolPropWrapper" RuntimeVersion="v4.0">
-    <ExternalLibrary Path="CoolPropWrapper.dll" LoadFromBytes="true"/>
+    <ExternalLibrary Path="CoolPropWrapper.dll" LoadFromBytes="true" ExplicitExports="false" ComServer="false" />
 </DnaLibrary>
 

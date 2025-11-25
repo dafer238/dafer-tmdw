@@ -70,7 +70,19 @@ Single-input properties:
 =Props1("Tcrit", "Water")
 ```
 
-Returns the critical temperature of water in **°C**.
+Returns the critical temperature of water in **°C** (approximately 373.95°C).
+
+```excel
+=Props1("Tcrit", "R410A")
+```
+
+Returns the critical temperature of R410A in **°C** (approximately 71.35°C, which is 344.5 K in SI units).
+
+```excel
+=Props1("Pcrit", "Water")
+```
+
+Returns the critical pressure of water in **bar** (approximately 220.6 bar).
 
 Phase determination:
 
@@ -88,7 +100,7 @@ For example using:
 =Props(E1,B1,B2,C1,C2,A2)
 ```
 
-![Parametric usage](https://github.com/Danisaski/dafer-tmpr/blob/main/imgs/screenshot.png)
+![Parametric usage](https://github.com/dafer238/dafer-tmdw/blob/main/imgs/screenshot.png)
 
 ### Humid Air Functions
 
@@ -130,15 +142,39 @@ This will return the humidity ratio (W) for air at **298.15 K**, **101325 Pa**, 
 
 ### Additional Functions
 
-#### `GetGlobalParamString(param)`
+#### `Props1(output, fluid)` and `Props1SI(output, fluid)`
+
+- Computes single-input properties (critical properties, molar mass, etc.)
+- `Props1` returns values in **engineering units** (°C, bar)
+- `Props1SI` returns values in **SI units** (K, Pa)
+- Example: `=Props1("Tcrit", "Water")` returns critical temperature in °C
+- Example: `=Props1SI("Pcrit", "Water")` returns critical pressure in Pa
+
+#### `Phase(name1, value1, name2, value2, fluid)` and `PhaseSI(...)`
+
+- Determines the phase of a fluid at given conditions
+- `Phase` accepts inputs in **engineering units** (°C, bar)
+- `PhaseSI` accepts inputs in **SI units** (K, Pa)
+- Returns phase string: "liquid", "gas", "supercritical", "twophase", etc.
+- Example: `=Phase("T", 25, "P", 1.01325, "Water")` returns "liquid"
+
+#### `GetGlobalParam(param)`
 
 - Retrieves global CoolProp parameters
-- Example: `=GetGlobalParamString("version")` returns the CoolProp version
+- Example: `=GetGlobalParam("version")` returns the CoolProp version
+- Example: `=GetGlobalParam("gitrevision")` returns the Git revision
 
-#### `GetFluidParamString(fluid, param)`
+#### `GetFluidParam(fluid, param)`
 
 - Retrieves fluid-specific parameters
-- Example: `=GetFluidParamString("Water", "formula")` returns "H2O"
+- Example: `=GetFluidParam("Water", "formula")` returns "H2O"
+- Example: `=GetFluidParam("Water", "CAS")` returns CAS registry number
+
+#### `MixtureString(elements, fractions)`
+
+- Creates a mixture string for CoolProp from element names and their mole/mass fractions
+- Example: `=MixtureString(A1:A2, B1:B2)` where A1:A2 contains ["R32", "R125"] and B1:B2 contains [0.5, 0.5]
+- Returns: "HEOS::R32[0.5]&R125[0.5]"
 
 ### Diagnostic Function
 
@@ -150,19 +186,22 @@ This will return the humidity ratio (W) for air at **298.15 K**, **101325 Pa**, 
 
 ### Function Summary
 
-| **Function**           | **Description**                | **Units**                    |
-| ---------------------- | ------------------------------ | ---------------------------- |
-| `Props`                | Real fluid properties          | Engineering (°C, bar, kJ/kg) |
-| `PropsSI`              | Real fluid properties          | SI (K, Pa, J/kg)             |
-| `Props1`               | Single-input properties        | Engineering (°C, bar)        |
-| `Props1SI`             | Single-input properties        | SI (K, Pa)                   |
-| `Phase`                | Phase determination            | Engineering (°C, bar)        |
-| `PhaseSI`              | Phase determination            | SI (K, Pa)                   |
-| `HAProps`              | Humid air properties           | Engineering (°C, bar, kJ/kg) |
-| `HAPropsSI`            | Humid air properties           | SI (K, Pa, J/kg)             |
-| `GetGlobalParamString` | Get CoolProp global parameters | N/A                          |
-| `GetFluidParamString`  | Get fluid-specific parameters  | N/A                          |
-| `CPropDiag`            | Diagnostic tool                | N/A                          |
+| **Function**     | **Description**                | **Units**                    |
+| ---------------- | ------------------------------ | ---------------------------- |
+| `Props`          | Real fluid properties          | Engineering (°C, bar, kJ/kg) |
+| `PropsSI`        | Real fluid properties          | SI (K, Pa, J/kg)             |
+| `TMPr`           | Alias for Props                | Engineering (°C, bar, kJ/kg) |
+| `Props1`         | Single-input properties        | Engineering (°C, bar)        |
+| `Props1SI`       | Single-input properties        | SI (K, Pa)                   |
+| `Phase`          | Phase determination            | Engineering (°C, bar)        |
+| `PhaseSI`        | Phase determination            | SI (K, Pa)                   |
+| `HAProps`        | Humid air properties           | Engineering (°C, bar, kJ/kg) |
+| `HAPropsSI`      | Humid air properties           | SI (K, Pa, J/kg)             |
+| `TMPa`           | Alias for HAProps              | Engineering (°C, bar, kJ/kg) |
+| `GetGlobalParam` | Get CoolProp global parameters | N/A                          |
+| `GetFluidParam`  | Get fluid-specific parameters  | N/A                          |
+| `MixtureString`  | Create mixture strings         | N/A                          |
+| `CPropDiag`      | Diagnostic tool                | N/A                          |
 
 ### Available Properties and Aliases
 
@@ -215,39 +254,116 @@ Air.mix, Amarillo.mix, Ekofisk.mix, GulfCoast.mix, GulfCoastGas(NIST1).mix, High
 
 You can also use CoolProp's mixture notation for custom mixtures, e.g., `"R32[0.5]&R125[0.5]"` for a 50/50 mix.
 
-### Complete Parameter List
+### Complete Parameter Reference
 
-The following parameters can be used in the `output`, `name1`, `name2`, and `name3` arguments. Parameters are **case-insensitive**:
+#### Props/PropsSI/Props1/Props1SI Parameters
 
-**State Properties:**
-A, ACENTRIC, acentric, ALPHA0, alpha0, ALPHAR, alphar, BVIRIAL, Bvirial, C, CONDUCTIVITY, conductivity, CP0MASS, Cp0mass, CP0MOLAR, Cp0molar, CPMASS, Cpmass, CPMOLAR, Cpmolar, CVIRIAL, Cvirial, CVMASS, Cvmass, CVMOLAR, Cvmolar, D, DELTA, Delta, DIPOLE_MOMENT, dipole_moment, DMASS, Dmass, DMOLAR, Dmolar
+All parameters are **case-insensitive**. The following table shows all recognized parameter variations:
 
-**Derivatives:**
-DALPHA0_DDELTA_CONSTTAU, dalpha0_ddelta_consttau, DALPHA0_DTAU_CONSTDELTA, dalpha0_dtau_constdelta, DALPHAR_DDELTA_CONSTTAU, dalphar_ddelta_consttau, DALPHAR_DTAU_CONSTDELTA, dalphar_dtau_constdelta, DBVIRIAL_DT, dBvirial_dT, DCVIRIAL_DT, dCvirial_dT
+| **Output Name**                            | **All Accepted Aliases (case-insensitive)**                                     | **Description**                               | **Units (Props)** | **Units (PropsSI)** |
+| ------------------------------------------ | ------------------------------------------------------------------------------- | --------------------------------------------- | ----------------- | ------------------- |
+| **T**                                      | T, TEMP, TEMPERATURE                                                            | Temperature                                   | °C                | K                   |
+| **P**                                      | P, PRES, PRESSURE                                                               | Pressure                                      | bar               | Pa                  |
+| **D**                                      | D, RHO, DENS, DENSITY, DMASS, D_MASS, RHOMASS                                   | Mass density                                  | kg/m³             | kg/m³               |
+| **Dmolar**                                 | DMOLAR, RHOMOLAR, DMOL, D_MOL, D_MOLAR                                          | Molar density                                 | mol/m³            | mol/m³              |
+| **H**                                      | H, ENTH, ENTHALPY, HMASS, H_MASS                                                | Mass specific enthalpy                        | kJ/kg             | J/kg                |
+| **Hmolar**                                 | HMOLAR, H_MOLAR                                                                 | Molar specific enthalpy                       | kJ/mol            | J/mol               |
+| **S**                                      | S, ENTR, ENTROPY, SMASS, S_MASS                                                 | Mass specific entropy                         | kJ/(kg·K)         | J/(kg·K)            |
+| **Smolar**                                 | SMOLAR, S_MOLAR                                                                 | Molar specific entropy                        | kJ/(mol·K)        | J/(mol·K)           |
+| **Smolar_residual**                        | SMOLAR_RESIDUAL, SMOLARRESIDUAL                                                 | Residual molar entropy                        | kJ/(mol·K)        | J/(mol·K)           |
+| **U**                                      | U, INTERNALENERGY, UMASS, U_MASS                                                | Mass specific internal energy                 | kJ/kg             | J/kg                |
+| **Umolar**                                 | UMOLAR, U_MOLAR                                                                 | Molar specific internal energy                | kJ/mol            | J/mol               |
+| **Q**                                      | Q, QUALITY, X, VAPORFRACTION, VAPOR_FRACTION                                    | Vapor quality (0=liquid, 1=vapor)             | -                 | -                   |
+| **Cpmass**                                 | CPMASS, CP, C                                                                   | Mass specific heat (constant P)               | kJ/(kg·K)         | J/(kg·K)            |
+| **Cvmass**                                 | CVMASS, CV                                                                      | Mass specific heat (constant V)               | kJ/(kg·K)         | J/(kg·K)            |
+| **Cpmolar**                                | CPMOLAR, CPMOL                                                                  | Molar specific heat (constant P)              | kJ/(mol·K)        | J/(mol·K)           |
+| **Cvmolar**                                | CVMOLAR, CVMOL                                                                  | Molar specific heat (constant V)              | kJ/(mol·K)        | J/(mol·K)           |
+| **Cp0mass**                                | CP0MASS                                                                         | Ideal gas mass specific heat                  | kJ/(kg·K)         | J/(kg·K)            |
+| **Cp0molar**                               | CP0MOLAR                                                                        | Ideal gas molar specific heat                 | kJ/(mol·K)        | J/(mol·K)           |
+| **G**                                      | G, GMASS, GIBBS                                                                 | Mass specific Gibbs energy                    | kJ/kg             | J/kg                |
+| **Gmolar**                                 | GMOLAR                                                                          | Molar specific Gibbs energy                   | kJ/mol            | J/mol               |
+| **A**                                      | A, SPEED_OF_SOUND, SPEEDOFSOUND, W                                              | Speed of sound                                | m/s               | m/s                 |
+| **viscosity**                              | MU, VISCOSITY, V                                                                | Dynamic viscosity                             | Pa·s              | Pa·s                |
+| **conductivity**                           | K, CONDUCTIVITY, L                                                              | Thermal conductivity                          | W/(m·K)           | W/(m·K)             |
+| **surface_tension**                        | SURFACE_TENSION, SURFACETENSION, SIGMA, I                                       | Surface tension                               | N/m               | N/m                 |
+| **Z**                                      | Z, COMPRESSIBILITY, COMPRESSIBILITYFACTOR                                       | Compressibility factor                        | -                 | -                   |
+| **Prandtl**                                | PRANDTL                                                                         | Prandtl number                                | -                 | -                   |
+| **Tau**                                    | TAU                                                                             | Reduced reciprocal temperature (Tc/T)         | -                 | -                   |
+| **Delta**                                  | DELTA                                                                           | Reduced density (ρ/ρc)                        | -                 | -                   |
+| **Alpha0**                                 | ALPHA0                                                                          | Ideal Helmholtz energy                        | -                 | -                   |
+| **Alphar**                                 | ALPHAR                                                                          | Residual Helmholtz energy                     | -                 | -                   |
+| **HELMHOLTZMASS**                          | HELMHOLTZMASS, HH                                                               | Mass specific Helmholtz energy                | J/kg              | J/kg                |
+| **HELMHOLTZMOLAR**                         | HELMHOLTZMOLAR                                                                  | Molar specific Helmholtz energy               | J/mol             | J/mol               |
+| **Bvirial**                                | BVIRIAL                                                                         | Second virial coefficient                     | -                 | -                   |
+| **Cvirial**                                | CVIRIAL                                                                         | Third virial coefficient                      | -                 | -                   |
+| **DBVIRIAL_DT**                            | DBVIRIAL_DT, DBVIRIAL, DBVIRIALDT                                               | Derivative of 2nd virial coeff w.r.t. T       | -                 | -                   |
+| **DCVIRIAL_DT**                            | DCVIRIAL_DT, DCVIRIAL, DCVIRIALDT                                               | Derivative of 3rd virial coeff w.r.t. T       | -                 | -                   |
+| **isentropic_expansion_coefficient**       | GAMMA, ISENTROPICEXPANSIONCOEFFICIENT                                           | Isentropic expansion coefficient              | -                 | -                   |
+| **isobaric_expansion_coefficient**         | ISOBARIC_EXPANSION_COEFFICIENT, ISOBARICEXPANSION, ISOBARICEXPANSIONCOEFFICIENT | Isobaric expansion coefficient                | 1/K               | 1/K                 |
+| **isothermal_compressibility**             | ISOTHERMAL_COMPRESSIBILITY, ISOTHERMALCOMPRESSIBILITY                           | Isothermal compressibility                    | 1/Pa              | 1/Pa                |
+| **fundamental_derivative_of_gas_dynamics** | FUNDAMENTAL_DERIVATIVE_OF_GAS_DYNAMICS, FUNDAMENTALDERIVATIVE, FH               | Fundamental derivative of gas dynamics        | -                 | -                   |
+| **acentric**                               | ACENTRIC, ACENTRIC_FACTOR, ACENTRICFACTOR, OMEGA                                | Acentric factor                               | -                 | -                   |
+| **DIPOLE_MOMENT**                          | DIPOLE_MOMENT, DIPOLEMOMENT, DIPOLE                                             | Dipole moment                                 | C·m               | C·m                 |
+| **gas_constant**                           | GAS_CONSTANT, GASCONSTANT                                                       | Molar gas constant                            | J/(mol·K)         | J/(mol·K)           |
+| **M**                                      | MM, MOLAR_MASS, MOLARMASS, MOLEMASS                                             | Molar mass                                    | kg/mol            | kg/mol              |
+| **Tcrit**                                  | TCRIT, T_CRITICAL, TCRITICAL                                                    | Critical temperature                          | °C                | K                   |
+| **Pcrit**                                  | PCRIT, P_CRITICAL, PCRITICAL                                                    | Critical pressure                             | bar               | Pa                  |
+| **rhocrit**                                | RHOCRIT, RHOCRITICAL, DCRIT                                                     | Mass density at critical point                | kg/m³             | kg/m³               |
+| **rhomass_critical**                       | RHOMASS_CRITICAL, RHOMASSCRITICAL                                               | Mass density at critical point                | kg/m³             | kg/m³               |
+| **rhomolar_critical**                      | RHOMOLAR_CRITICAL, RHOMOLARCRITICAL                                             | Molar density at critical point               | mol/m³            | mol/m³              |
+| **Tmax**                                   | TMAX, T_MAX                                                                     | Maximum temperature limit                     | °C                | K                   |
+| **Tmin**                                   | TMIN, T_MIN                                                                     | Minimum temperature limit                     | °C                | K                   |
+| **pmax**                                   | PMAX, P_MAX                                                                     | Maximum pressure limit                        | bar               | Pa                  |
+| **pmin**                                   | PMIN, P_MIN                                                                     | Minimum pressure limit                        | bar               | Pa                  |
+| **Ttriple**                                | TTRIPLE, T_TRIPLE, TTRIP                                                        | Triple point temperature                      | °C                | K                   |
+| **ptriple**                                | PTRIPLE, P_TRIPLE, PTRIP                                                        | Triple point pressure                         | bar               | Pa                  |
+| **T_freeze**                               | T_FREEZE, TFREEZE, FREEZING_TEMPERATURE                                         | Freezing temperature                          | °C                | K                   |
+| **T_reducing**                             | T_REDUCING, TREDUCING                                                           | Reducing point temperature                    | °C                | K                   |
+| **p_reducing**                             | P_REDUCING, PREDUCING                                                           | Reducing point pressure                       | bar               | Pa                  |
+| **rhomass_reducing**                       | RHOMASS_REDUCING, RHOMASSREDUCING                                               | Mass density at reducing point                | kg/m³             | kg/m³               |
+| **rhomolar_reducing**                      | RHOMOLAR_REDUCING, RHOMOLARREDUCING                                             | Molar density at reducing point               | mol/m³            | mol/m³              |
+| **fraction_max**                           | FRACTION_MAX, FRACTIONMAX                                                       | Maximum fraction for incompressible solutions | -                 | -                   |
+| **fraction_min**                           | FRACTION_MIN, FRACTIONMIN                                                       | Minimum fraction for incompressible solutions | -                 | -                   |
+| **GWP20**                                  | GWP20, GWP_20                                                                   | 20-year global warming potential              | -                 | -                   |
+| **GWP100**                                 | GWP100, GWP_100                                                                 | 100-year global warming potential             | -                 | -                   |
+| **GWP500**                                 | GWP500, GWP_500                                                                 | 500-year global warming potential             | -                 | -                   |
+| **ODP**                                    | ODP, OZONEDEPLETIONPOTENTIAL                                                    | Ozone depletion potential                     | -                 | -                   |
+| **Phase**                                  | PHASE                                                                           | Phase identification                          | -                 | -                   |
+| **PIP**                                    | PIP                                                                             | Phase identification parameter                | -                 | -                   |
 
-**Energy & Entropy:**
-FH, FUNDAMENTAL_DERIVATIVE_OF_GAS_DYNAMICS, fundamental_derivative_of_gas_dynamics, G, GAS_CONSTANT, gas_constant, GMASS, Gmass, GMOLAR, Gmolar, H, HH, HMASS, Hmass, HMOLAR, Hmolar, S, SMASS, Smass, SMOLAR, Smolar, SMOLAR_RESIDUAL, Smolar_residual, U, UMASS, Umass, UMOLAR, Umolar
+**Helmholtz Energy Derivatives** (advanced users):
+- DALPHA0_DDELTA_CONSTTAU, DALPHA0_DDELTA
+- DALPHA0_DTAU_CONSTDELTA, DALPHA0_DTAU  
+- DALPHAR_DDELTA_CONSTTAU, DALPHAR_DDELTA
+- DALPHAR_DTAU_CONSTDELTA, DALPHAR_DTAU
 
-**Environmental:**
-GWP20, GWP100, GWP500, ODP
+#### HAProps/HAPropsSI Parameters
 
-**Transport & Dimensionless:**
-I, ISOBARIC_EXPANSION_COEFFICIENT, isobaric_expansion_coefficient, ISOTHERMAL_COMPRESSIBILITY, isothermal_compressibility, L, PRANDTL, Prandtl, VISCOSITY, viscosity, Z
+All parameters for humid air calculations are **case-insensitive**:
 
-**Critical, Triple & Reducing:**
-PCRIT, Pcrit, P_CRITICAL, p_critical, PMAX, P_MAX, P_max, pmax, PMIN, P_MIN, P_min, pmin, PTRIPLE, P_TRIPLE, p_triple, ptriple, P_REDUCING, p_reducing, TCRIT, Tcrit, T_CRITICAL, T_critical, TMAX, T_MAX, T_max, Tmax, TMIN, T_MIN, T_min, Tmin, TTRIPLE, T_TRIPLE, t_triple, Ttriple, T_FREEZE, T_freeze, t_freeze, T_REDUCING, T_reducing, t_reducing, RHOCRIT, rhocrit, RHOMASS_CRITICAL, rhomass_critical, RHOMASS_REDUCING, rhomass_reducing, RHOMOLAR_CRITICAL, rhomolar_critical, RHOMOLAR_REDUCING, rhomolar_reducing
-
-**Molecular & Mixture:**
-M, MOLARMASS, molarmass, MOLAR_MASS, molar_mass, MOLEMASS, molemass, FRACTION_MAX, fraction_max, FRACTION_MIN, fraction_min
-
-**Phase:**
-O, PHASE, Phase, PH, PIP, Q
-
-**State Variables:**
-P, T, TAU, Tau, V
-
-**Surface:**
-SURFACE_TENSION, surface_tension, SPEED_OF_SOUND, speed_of_sound
+| **Output Name** | **All Accepted Aliases (case-insensitive)**                               | **Description**                    | **Units (HAProps)**     | **Units (HAPropsSI)**   |
+| --------------- | ------------------------------------------------------------------------- | ---------------------------------- | ----------------------- | ----------------------- |
+| **T**           | T, TDB, T_DB, TEMP, TEMPERATURE, DRYBULB, DRYBULBTEMP, DRYBULBTEMPERATURE | Dry-bulb temperature               | °C                      | K                       |
+| **Twb**         | B, TWB, T_WB, WETBULB, WETBULBTEMP, WETBULBTEMPERATURE                    | Wet-bulb temperature               | °C                      | K                       |
+| **Tdp**         | D, TDP, T_DP, DEWPOINT, DEWPOINTTEMP, DEWPOINTTEMPERATURE                 | Dew-point temperature              | °C                      | K                       |
+| **P**           | P, PRESSURE, PRES                                                         | Atmospheric pressure               | bar                     | Pa                      |
+| **P_w**         | P_W, PW, PARTIALPRESSURE, WATERPRESSURE                                   | Water vapor partial pressure       | bar                     | Pa                      |
+| **R**           | R, RH, RELHUM, RELATIVEHUMIDITY                                           | Relative humidity (0-1)            | -                       | -                       |
+| **W**           | W, OMEGA, HUMRAT, HUMIDITYRATIO, MIXINGRATIO                              | Humidity ratio                     | kg water/kg dry air     | kg water/kg dry air     |
+| **Psi_w**       | PSI_W, PSIW, Y                                                            | Water mole fraction                | mol water/mol humid air | mol water/mol humid air |
+| **Hda**         | H, HDA, H_DA, ENTHALPY                                                    | Enthalpy per unit dry air          | kJ/kg dry air           | J/kg dry air            |
+| **Hha**         | HHA, H_HA                                                                 | Enthalpy per unit humid air        | kJ/kg humid air         | J/kg humid air          |
+| **Sda**         | S, SDA, S_DA, ENTROPY                                                     | Entropy per unit dry air           | kJ/(kg·K) dry air       | J/(kg·K) dry air        |
+| **Sha**         | SHA, S_HA                                                                 | Entropy per unit humid air         | kJ/(kg·K) humid air     | J/(kg·K) humid air      |
+| **Vda**         | V, VDA, V_DA                                                              | Volume per unit dry air            | m³/kg dry air           | m³/kg dry air           |
+| **Vha**         | VHA, V_HA                                                                 | Volume per unit humid air          | m³/kg humid air         | m³/kg humid air         |
+| **Cda**         | C, CP, CDA, CPDA, CP_DA                                                   | Specific heat per unit dry air     | kJ/(kg·K) dry air       | J/(kg·K) dry air        |
+| **Cha**         | CHA, CPHA, CP_HA                                                          | Specific heat per unit humid air   | kJ/(kg·K) humid air     | J/(kg·K) humid air      |
+| **CV**          | CV, CVMASS                                                                | Constant volume heat per dry air   | kJ/(kg·K) dry air       | J/(kg·K) dry air        |
+| **CVha**        | CVHA, CV_HA                                                               | Constant volume heat per humid air | kJ/(kg·K) humid air     | J/(kg·K) humid air      |
+| **K**           | K, CONDUCTIVITY, THERMALCONDUCTIVITY                                      | Thermal conductivity               | W/(m·K)                 | W/(m·K)                 |
+| **MU**          | M, MU, VISC, VISCOSITY, DYNAMICVISCOSITY                                  | Dynamic viscosity                  | Pa·s                    | Pa·s                    |
+| **Z**           | Z, COMPRESSIBILITY, COMPRESSIBILITYFACTOR                                 | Compressibility factor             | -                       | -                       |
 
 For more details, visit the [CoolProp documentation](http://www.coolprop.org/).
 
