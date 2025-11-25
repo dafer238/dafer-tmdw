@@ -94,12 +94,11 @@ git commit -m "Build version 0.1.2"
 
 # 3. Create and push tag
 git tag v0.1.2
-git push origin main
 git push origin v0.1.2
 ```
 
 Within a few minutes, a new release will appear at:
-`https://github.com/YOUR_USERNAME/dafer-tmdw/releases/tag/v0.1.2`
+`https://github.com/dafer238/dafer-tmdw/releases/tag/v0.1.2`
 
 ## Manual Release Trigger
 
