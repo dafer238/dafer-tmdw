@@ -142,22 +142,6 @@ This will return the humidity ratio (W) for air at **298.15 K**, **101325 Pa**, 
 
 ### Additional Functions
 
-#### `Props1(output, fluid)` and `Props1SI(output, fluid)`
-
-- Computes single-input properties (critical properties, molar mass, etc.)
-- `Props1` returns values in **engineering units** (°C, bar)
-- `Props1SI` returns values in **SI units** (K, Pa)
-- Example: `=Props1("Tcrit", "Water")` returns critical temperature in °C
-- Example: `=Props1SI("Pcrit", "Water")` returns critical pressure in Pa
-
-#### `Phase(name1, value1, name2, value2, fluid)` and `PhaseSI(...)`
-
-- Determines the phase of a fluid at given conditions
-- `Phase` accepts inputs in **engineering units** (°C, bar)
-- `PhaseSI` accepts inputs in **SI units** (K, Pa)
-- Returns phase string: "liquid", "gas", "supercritical", "twophase", etc.
-- Example: `=Phase("T", 25, "P", 1.01325, "Water")` returns "liquid"
-
 #### `GetGlobalParam(param)`
 
 - Retrieves global CoolProp parameters
@@ -190,14 +174,12 @@ This will return the humidity ratio (W) for air at **298.15 K**, **101325 Pa**, 
 | ---------------- | ------------------------------ | ---------------------------- |
 | `Props`          | Real fluid properties          | Engineering (°C, bar, kJ/kg) |
 | `PropsSI`        | Real fluid properties          | SI (K, Pa, J/kg)             |
-| `TMPr`           | Alias for Props                | Engineering (°C, bar, kJ/kg) |
 | `Props1`         | Single-input properties        | Engineering (°C, bar)        |
 | `Props1SI`       | Single-input properties        | SI (K, Pa)                   |
 | `Phase`          | Phase determination            | Engineering (°C, bar)        |
 | `PhaseSI`        | Phase determination            | SI (K, Pa)                   |
 | `HAProps`        | Humid air properties           | Engineering (°C, bar, kJ/kg) |
 | `HAPropsSI`      | Humid air properties           | SI (K, Pa, J/kg)             |
-| `TMPa`           | Alias for HAProps              | Engineering (°C, bar, kJ/kg) |
 | `GetGlobalParam` | Get CoolProp global parameters | N/A                          |
 | `GetFluidParam`  | Get fluid-specific parameters  | N/A                          |
 | `MixtureString`  | Create mixture strings         | N/A                          |
