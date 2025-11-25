@@ -49,7 +49,7 @@ public static class CoolPropWrapper
                 {
                     // Try to set the DLL directory first
                     SetDllDirectory(searchPath);
-                    
+
                     // Try to load with full path
                     IntPtr handle = LoadLibrary(coolPropPath);
                     if (handle != IntPtr.Zero)
@@ -120,7 +120,7 @@ public static class CoolPropWrapper
             {
                 result += $"Current Directory: ERROR - {ex.Message}\n";
             }
-            
+
             return result;
         }
         catch (Exception ex)
@@ -599,12 +599,16 @@ public static object CPropHA_E(string output, string name1, object value1, strin
             case "smolar_residual":
                 return "Smolar_residual";
             case "tcrit":
+            case "t_critical":
                 return "Tcrit";
             case "tmax":
+            case "t_max":
                 return "Tmax";
             case "tmin":
+            case "t_min":
                 return "Tmin";
             case "ttriple":
+            case "t_triple":
                 return "Ttriple";
             case "t_freeze":
                 return "T_freeze";
@@ -626,6 +630,12 @@ public static object CPropHA_E(string output, string name1, object value1, strin
         switch (name)
         {
             case "T": // Temperature (°C to K)
+            case "Tcrit": // Critical temperature (°C to K)
+            case "Tmax": // Maximum temperature (°C to K)
+            case "Tmin": // Minimum temperature (°C to K)
+            case "Ttriple": // Triple point temperature (°C to K)
+            case "T_freeze": // Freeze temperature (°C to K)
+            case "T_reducing": // Reducing temperature (°C to K)
                 return value + 273.15;
             case "P": // Pressure (bar to Pa)
                 return value * 1e5;
@@ -647,6 +657,12 @@ public static object CPropHA_E(string output, string name1, object value1, strin
         switch (name)
         {
             case "T": // Temperature (K to °C)
+            case "Tcrit": // Critical temperature (K to °C)
+            case "Tmax": // Maximum temperature (K to °C)
+            case "Tmin": // Minimum temperature (K to °C)
+            case "Ttriple": // Triple point temperature (K to °C)
+            case "T_freeze": // Freeze temperature (K to °C)
+            case "T_reducing": // Reducing temperature (K to °C)
                 return value - 273.15;
             case "P": // Pressure (Pa to bar)
                 return value / 1e5;
@@ -780,4 +796,3 @@ public static object CPropHA_E(string output, string name1, object value1, strin
     }
 
 }
-
