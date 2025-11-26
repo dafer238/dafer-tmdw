@@ -295,7 +295,8 @@ All parameter names are **case-insensitive**. You can type them in any combinati
 Air.mix, Amarillo.mix, Ekofisk.mix, GulfCoast.mix, GulfCoastGas(NIST1).mix, HighCO2.mix, HighN2.mix, NaturalGasSample.mix, R401A.mix, R401B.mix, R401C.mix, R402A.mix, R402B.mix, R403A.mix, R403B.mix, R404A.mix, R405A.mix, R406A.mix, R407A.mix, R407B.mix, R407C.mix, R407D.mix, R407E.mix, R407F.mix, R408A.mix, R409A.mix, R409B.mix, R410A.mix, R410B.mix, R411A.mix, R411B.mix, R412A.mix, R413A.mix, R414A.mix, R414B.mix, R415A.mix, R415B.mix, R416A.mix, R417A.mix, R417B.mix, R417C.mix, R418A.mix, R419A.mix, R419B.mix, R420A.mix, R421A.mix, R421B.mix, R422A.mix, R422B.mix, R422C.mix, R422D.mix, R422E.mix, R423A.mix, R424A.mix, R425A.mix, R426A.mix, R427A.mix, R428A.mix, R429A.mix, R430A.mix, R431A.mix, R432A.mix, R433A.mix, R433B.mix, R433C.mix, R434A.mix, R435A.mix, R436A.mix, R436B.mix, R437A.mix, R438A.mix, R439A.mix, R440A.mix, R441A.mix, R442A.mix, R443A.mix, R444A.mix, R444B.mix, R445A.mix, R446A.mix, R447A.mix, R448A.mix, R449A.mix, R449B.mix, R450A.mix, R451A.mix, R451B.mix, R452A.mix, R453A.mix, R454A.mix, R454B.mix, R500.mix, R501.mix, R502.mix, R503.mix, R504.mix, R507A.mix, R508A.mix, R508B.mix, R509A.mix, R510A.mix, R511A.mix, R512A.mix, R513A.mix, TypicalNaturalGas.mix
 
 You can also use CoolProp's mixture notation for custom mixtures, e.g., `"R32[0.5]&R125[0.5]"` for a 50/50 mix.
-
+<details>
+  <summary><h3>Unfold for a complete list of accepted inputs</h3></summary>
 ### Complete Parameter Reference
 
 #### Props/PropsSI/Props1/Props1SI Parameters
@@ -406,6 +407,8 @@ All parameters for humid air calculations are **case-insensitive**:
 | **K**           | K, CONDUCTIVITY, THERMALCONDUCTIVITY                                      | Thermal conductivity               | W/(m·K)                 | W/(m·K)                 |
 | **MU**          | M, MU, VISC, VISCOSITY, DYNAMICVISCOSITY                                  | Dynamic viscosity                  | Pa·s                    | Pa·s                    |
 | **Z**           | Z, COMPRESSIBILITY, COMPRESSIBILITYFACTOR                                 | Compressibility factor             | -                       | -                       |
+
+</details>
 
 For more details, visit the [CoolProp documentation](http://www.coolprop.org/).
 
