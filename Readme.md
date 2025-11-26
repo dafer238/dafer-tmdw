@@ -297,6 +297,7 @@ Air.mix, Amarillo.mix, Ekofisk.mix, GulfCoast.mix, GulfCoastGas(NIST1).mix, High
 You can also use CoolProp's mixture notation for custom mixtures, e.g., `"R32[0.5]&R125[0.5]"` for a 50/50 mix.
 <details>
   <summary><h3>Unfold for a complete list of accepted inputs</h3></summary>
+  
 ### Complete Parameter Reference
 
 #### Props/PropsSI/Props1/Props1SI Parameters
