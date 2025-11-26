@@ -19,6 +19,7 @@ CoolPropWrapper allows you to compute thermodynamic properties of real fluids an
 
 - Computes thermodynamic properties of real fluids using **engineering units**.
 - Standard CoolProp function with engineering units instead of SI.
+- **Supports Excel range inputs** - any numeric parameter can be a cell range, and the function will automatically calculate results for all values and spill them as an array.
 - **Units used:**
   - Temperature: **Celsius (°C)** (converted internally to Kelvin (K))
   - Pressure: **bar** (converted internally to Pascal (Pa))
@@ -29,6 +30,7 @@ CoolPropWrapper allows you to compute thermodynamic properties of real fluids an
 
 - Computes thermodynamic properties of real fluids using **SI units** (no conversion).
 - Standard CoolProp function.
+- **Supports Excel range inputs** - any numeric parameter can be a cell range, and the function will automatically calculate results for all values and spill them as an array.
 - **Units used:**
   - Temperature: **Kelvin (K)**
   - Pressure: **Pascal (Pa)**
@@ -63,6 +65,38 @@ For SI units:
 ```
 
 This will return the enthalpy (H) of water at **298.15 K** and **101325 Pa** in J/kg.
+
+**Array calculations** - compute properties for multiple values at once:
+
+```excel
+=Props("H", "T", 25, "P", A1:A10, "Water")
+```
+
+This will return an array of 10 enthalpy values, one for each pressure in the range A1:A10, automatically spilling the results to adjacent cells below (column orientation).
+
+**Row arrays** - when the input is a row range, the output will also spill horizontally:
+
+```excel
+=Props("H", "T", 25, "P", A1:J1, "Water")
+```
+
+This will return a row of 10 enthalpy values, spilling horizontally across columns.
+
+**Multiple array inputs** - when using multiple ranges, they must have the same length:
+
+```excel
+=Props("H", "T", B1:B10, "P", A1:A10, "Water")
+```
+
+This will compute 10 enthalpy values using paired temperatures from B1:B10 and pressures from A1:A10.
+
+**Mixed scalar and array inputs**:
+
+```excel
+=Props("H", "P", 1.01325, "T", A1:A5, "Water")
+```
+
+The scalar pressure value (1.01325 bar) will be used for all 5 temperature values in A1:A5.
 
 Single-input properties:
 
@@ -108,6 +142,7 @@ For example using:
 
 - Computes thermodynamic properties of humid air using **engineering units**.
 - Standard CoolProp function with engineering units instead of SI.
+- **Supports Excel range inputs** - any numeric parameter can be a cell range, and the function will automatically calculate results for all values and spill them as an array.
 - **Units used:**
   - Temperature: **Celsius (°C)** (converted internally to Kelvin (K))
   - Pressure: **bar** (converted internally to Pascal (Pa))
@@ -118,6 +153,7 @@ For example using:
 
 - Computes thermodynamic properties of humid air using **SI units** (no conversion).
 - Standard CoolProp function.
+- **Supports Excel range inputs** - any numeric parameter can be a cell range, and the function will automatically calculate results for all values and spill them as an array.
 - **Units used:**
   - Temperature: **Kelvin (K)**
   - Pressure: **Pascal (Pa)**
@@ -139,6 +175,30 @@ For SI units:
 ```
 
 This will return the humidity ratio (W) for air at **298.15 K**, **101325 Pa**, and **50% relative humidity**.
+
+**Array calculations** - compute humid air properties for multiple values:
+
+```excel
+=HAProps("W", "T", A1:A10, "P", 1.01325, "R", 0.5)
+```
+
+This will return an array of 10 humidity ratio values, one for each temperature in A1:A10, spilling vertically.
+
+**Row arrays** - when the input is a row range, the output will also spill horizontally:
+
+```excel
+=HAProps("W", "T", A1:J1, "P", 1.01325, "R", 0.5)
+```
+
+This will return a row of 10 humidity ratio values, spilling horizontally across columns.
+
+**Multiple array inputs** - all ranges must have the same length:
+
+```excel
+=HAProps("Hda", "T", A1:A5, "P", 1.01325, "R", B1:B5)
+```
+
+This will compute 5 enthalpy values using paired temperatures from A1:A5 and relative humidities from B1:B5.
 
 ### Additional Functions
 

@@ -1,12 +1,263 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using ExcelDna.Integration;
 
 public static class CoolPropWrapper
 {
+    // Static dictionaries for fast lookups (initialized once, thread-safe)
+    private static readonly Dictionary<string, string> PropertyNameMap;
+    private static readonly Dictionary<string, string> FluidNameMap;
+    private static readonly Dictionary<string, string> HumidAirPropertyMap;
+    private static readonly HashSet<string> TemperatureProperties;
+    private static readonly HashSet<string> PressureProperties;
+    private static readonly HashSet<string> EnergyProperties;
+
+    // Static constructor to initialize dictionaries
+    static CoolPropWrapper()
+    {
+        // Initialize property name mappings
+        PropertyNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Temperature
+            ["T"] = "T", ["TEMP"] = "T", ["TEMPERATURE"] = "T",
+            // Pressure
+            ["P"] = "P", ["PRES"] = "P", ["PRESSURE"] = "P",
+            // Enthalpy
+            ["H"] = "H", ["ENTH"] = "H", ["ENTHALPY"] = "H", ["HMASS"] = "H", ["H_MASS"] = "H",
+            ["HMOLAR"] = "Hmolar", ["H_MOLAR"] = "Hmolar",
+            // Internal Energy
+            ["U"] = "U", ["INTERNALENERGY"] = "U", ["UMASS"] = "U", ["U_MASS"] = "U",
+            ["UMOLAR"] = "Umolar", ["U_MOLAR"] = "Umolar",
+            // Entropy
+            ["S"] = "S", ["ENTR"] = "S", ["ENTROPY"] = "S", ["SMASS"] = "S", ["S_MASS"] = "S",
+            ["SMOLAR"] = "Smolar", ["S_MOLAR"] = "Smolar",
+            ["SMOLAR_RESIDUAL"] = "Smolar_residual", ["SMOLARRESIDUAL"] = "Smolar_residual",
+            // Density
+            ["D"] = "D", ["RHO"] = "D", ["DENS"] = "D", ["DENSITY"] = "D", ["DMASS"] = "D", ["D_MASS"] = "D", ["RHOMASS"] = "D",
+            ["DMOLAR"] = "Dmolar", ["RHOMOLAR"] = "Dmolar", ["DMOL"] = "Dmolar", ["D_MOL"] = "Dmolar", ["D_MOLAR"] = "Dmolar",
+            // Specific Heat Capacity
+            ["CVMASS"] = "Cvmass", ["CV"] = "Cvmass",
+            ["CPMASS"] = "Cpmass", ["CP"] = "Cpmass", ["C"] = "Cpmass",
+            ["CPMOLAR"] = "Cpmolar", ["CPMOL"] = "Cpmolar",
+            ["CVMOLAR"] = "Cvmolar", ["CVMOL"] = "Cvmolar",
+            ["CP0MASS"] = "Cp0mass", ["CP0MOLAR"] = "Cp0molar",
+            // Quality
+            ["Q"] = "Q", ["QUALITY"] = "Q", ["X"] = "Q", ["VAPORFRACTION"] = "Q", ["VAPOR_FRACTION"] = "Q",
+            // Reduced properties
+            ["TAU"] = "Tau", ["DELTA"] = "Delta",
+            // Helmholtz derivatives
+            ["ALPHA0"] = "Alpha0", ["ALPHAR"] = "Alphar",
+            ["DALPHA0_DDELTA_CONSTTAU"] = "DALPHA0_DDELTA_CONSTTAU", ["DALPHA0_DDELTA"] = "DALPHA0_DDELTA_CONSTTAU",
+            ["DALPHA0_DTAU_CONSTDELTA"] = "DALPHA0_DTAU_CONSTDELTA", ["DALPHA0_DTAU"] = "DALPHA0_DTAU_CONSTDELTA",
+            ["DALPHAR_DDELTA_CONSTTAU"] = "DALPHAR_DDELTA_CONSTTAU", ["DALPHAR_DDELTA"] = "DALPHAR_DDELTA_CONSTTAU",
+            ["DALPHAR_DTAU_CONSTDELTA"] = "DALPHAR_DTAU_CONSTDELTA", ["DALPHAR_DTAU"] = "DALPHAR_DTAU_CONSTDELTA",
+            // Speed of sound
+            ["SPEED_OF_SOUND"] = "A", ["SPEEDOFSOUND"] = "A", ["A"] = "A", ["W"] = "A",
+            // Virial coefficients
+            ["BVIRIAL"] = "Bvirial", ["CVIRIAL"] = "Cvirial",
+            ["DBVIRIAL_DT"] = "DBVIRIAL_DT", ["DBVIRIAL"] = "DBVIRIAL_DT", ["DBVIRIALDT"] = "DBVIRIAL_DT",
+            ["DCVIRIAL_DT"] = "DCVIRIAL_DT", ["DCVIRIAL"] = "DCVIRIAL_DT", ["DCVIRIALDT"] = "DCVIRIAL_DT",
+            // Conductivity
+            ["K"] = "conductivity", ["CONDUCTIVITY"] = "conductivity", ["L"] = "conductivity",
+            // Dipole moment
+            ["DIPOLE_MOMENT"] = "DIPOLE_MOMENT", ["DIPOLEMOMENT"] = "DIPOLE_MOMENT", ["DIPOLE"] = "DIPOLE_MOMENT",
+            // Gibbs energy
+            ["G"] = "G", ["GMASS"] = "G", ["GIBBS"] = "G",
+            ["GMOLAR"] = "Gmolar",
+            // Helmholtz energy
+            ["HELMHOLTZMASS"] = "HELMHOLTZMASS", ["HELMHOLTZMOLAR"] = "HELMHOLTZMOLAR", ["HH"] = "HELMHOLTZMASS",
+            // Expansion coefficients
+            ["GAMMA"] = "isentropic_expansion_coefficient", ["ISENTROPICEXPANSIONCOEFFICIENT"] = "isentropic_expansion_coefficient",
+            ["ISOBARIC_EXPANSION_COEFFICIENT"] = "isobaric_expansion_coefficient", ["ISOBARICEXPANSION"] = "isobaric_expansion_coefficient", ["ISOBARICEXPANSIONCOEFFICIENT"] = "isobaric_expansion_coefficient",
+            ["ISOTHERMAL_COMPRESSIBILITY"] = "isothermal_compressibility", ["ISOTHERMALCOMPRESSIBILITY"] = "isothermal_compressibility",
+            // Surface tension
+            ["SURFACE_TENSION"] = "surface_tension", ["SURFACETENSION"] = "surface_tension", ["SIGMA"] = "surface_tension", ["I"] = "surface_tension",
+            // Molar mass
+            ["MM"] = "M", ["MOLAR_MASS"] = "M", ["MOLARMASS"] = "M", ["MOLEMASS"] = "M",
+            // Critical properties
+            ["PCRIT"] = "Pcrit", ["P_CRITICAL"] = "Pcrit", ["PCRITICAL"] = "Pcrit",
+            ["TCRIT"] = "Tcrit", ["T_CRITICAL"] = "Tcrit", ["TCRITICAL"] = "Tcrit",
+            ["RHOCRIT"] = "rhocrit", ["RHOCRITICAL"] = "rhocrit", ["DCRIT"] = "rhocrit",
+            ["RHOMASS_CRITICAL"] = "rhomass_critical", ["RHOMASSCRITICAL"] = "rhomass_critical",
+            ["RHOMOLAR_CRITICAL"] = "rhomolar_critical", ["RHOMOLARCRITICAL"] = "rhomolar_critical",
+            // Phase
+            ["PHASE"] = "Phase",
+            // Max/Min properties
+            ["PMAX"] = "pmax", ["P_MAX"] = "pmax",
+            ["PMIN"] = "pmin", ["P_MIN"] = "pmin",
+            ["TMAX"] = "Tmax", ["T_MAX"] = "Tmax",
+            ["TMIN"] = "Tmin", ["T_MIN"] = "Tmin",
+            // Prandtl number
+            ["PRANDTL"] = "Prandtl",
+            // Triple point
+            ["PTRIPLE"] = "ptriple", ["P_TRIPLE"] = "ptriple", ["PTRIP"] = "ptriple",
+            ["TTRIPLE"] = "Ttriple", ["T_TRIPLE"] = "Ttriple", ["TTRIP"] = "Ttriple",
+            // Reducing properties
+            ["P_REDUCING"] = "p_reducing", ["PREDUCING"] = "p_reducing",
+            ["T_REDUCING"] = "T_reducing", ["TREDUCING"] = "T_reducing",
+            ["RHOMASS_REDUCING"] = "rhomass_reducing", ["RHOMASSREDUCING"] = "rhomass_reducing",
+            ["RHOMOLAR_REDUCING"] = "rhomolar_reducing", ["RHOMOLARREDUCING"] = "rhomolar_reducing",
+            // Freeze temperature
+            ["T_FREEZE"] = "T_freeze", ["TFREEZE"] = "T_freeze", ["FREEZING_TEMPERATURE"] = "T_freeze",
+            // Viscosity
+            ["MU"] = "viscosity", ["VISCOSITY"] = "viscosity", ["V"] = "viscosity",
+            // Compressibility factor
+            ["Z"] = "Z", ["COMPRESSIBILITY"] = "Z", ["COMPRESSIBILITYFACTOR"] = "Z",
+            // Acentric factor
+            ["ACENTRIC"] = "acentric", ["ACENTRIC_FACTOR"] = "acentric", ["ACENTRICFACTOR"] = "acentric", ["OMEGA"] = "acentric",
+            // Other properties
+            ["FUNDAMENTAL_DERIVATIVE_OF_GAS_DYNAMICS"] = "fundamental_derivative_of_gas_dynamics", ["FUNDAMENTALDERIVATIVE"] = "fundamental_derivative_of_gas_dynamics", ["FH"] = "fundamental_derivative_of_gas_dynamics",
+            ["GAS_CONSTANT"] = "gas_constant", ["GASCONSTANT"] = "gas_constant",
+            ["FRACTION_MAX"] = "fraction_max", ["FRACTIONMAX"] = "fraction_max",
+            ["FRACTION_MIN"] = "fraction_min", ["FRACTIONMIN"] = "fraction_min",
+            ["GWP20"] = "GWP20", ["GWP_20"] = "GWP20",
+            ["GWP100"] = "GWP100", ["GWP_100"] = "GWP100",
+            ["GWP500"] = "GWP500", ["GWP_500"] = "GWP500",
+            ["ODP"] = "ODP", ["OZONEDEPLETIONPOTENTIAL"] = "ODP",
+            ["PIP"] = "PIP"
+        };
+
+        // Initialize fluid name mappings
+        FluidNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["1BUTENE"] = "1-Butene", ["ACETONE"] = "Acetone", ["AIR"] = "Air",
+            ["AMMONIA"] = "Ammonia", ["NH3"] = "Ammonia",
+            ["ARGON"] = "Argon", ["AR"] = "Argon",
+            ["BENZENE"] = "Benzene",
+            ["CARBONDIOXIDE"] = "CarbonDioxide", ["CO2"] = "CarbonDioxide",
+            ["CARBONMONOXIDE"] = "CarbonMonoxide", ["CO"] = "CarbonMonoxide",
+            ["CARBONYLSULFIDE"] = "CarbonylSulfide", ["COS"] = "CarbonylSulfide",
+            ["CIS2BUTENE"] = "cis-2-Butene",
+            ["CYCLOHEXANE"] = "CycloHexane", ["CYCLOPENTANE"] = "Cyclopentane", ["CYCLOPROPANE"] = "CycloPropane",
+            ["D4"] = "D4", ["D5"] = "D5", ["D6"] = "D6",
+            ["DEUTERIUM"] = "Deuterium", ["D2"] = "Deuterium",
+            ["DICHLOROETHANE"] = "Dichloroethane", ["DIETHYLETHER"] = "DiethylEther",
+            ["DIMETHYLCARBONATE"] = "DimethylCarbonate",
+            ["DIMETHYLETHER"] = "DimethylEther", ["DME"] = "DimethylEther",
+            ["ETHANE"] = "Ethane", ["C2H6"] = "Ethane",
+            ["ETHANOL"] = "Ethanol", ["ETHYLBENZENE"] = "EthylBenzene",
+            ["ETHYLENE"] = "Ethylene", ["C2H4"] = "Ethylene",
+            ["ETHYLENEOXIDE"] = "EthyleneOxide",
+            ["FLUORINE"] = "Fluorine", ["F2"] = "Fluorine",
+            ["HEAVYWATER"] = "HeavyWater", ["D2O"] = "HeavyWater",
+            ["HELIUM"] = "Helium", ["HE"] = "Helium",
+            ["HFE143M"] = "HFE143m",
+            ["HYDROGEN"] = "Hydrogen", ["H2"] = "Hydrogen",
+            ["HYDROGENCHLORIDE"] = "HydrogenChloride", ["HCL"] = "HydrogenChloride",
+            ["HYDROGENSULFIDE"] = "HydrogenSulfide", ["H2S"] = "HydrogenSulfide",
+            ["ISOBUTANE"] = "IsoButane", ["IBUTANE"] = "IsoButane",
+            ["ISOBUTENE"] = "IsoButene", ["IBUTENE"] = "IsoButene",
+            ["ISOHEXANE"] = "Isohexane", ["ISOPENTANE"] = "Isopentane",
+            ["KRYPTON"] = "Krypton", ["KR"] = "Krypton",
+            ["MXYLENE"] = "m-Xylene",
+            ["MD2M"] = "MD2M", ["MD3M"] = "MD3M", ["MD4M"] = "MD4M", ["MDM"] = "MDM",
+            ["METHANE"] = "Methane", ["CH4"] = "Methane",
+            ["METHANOL"] = "Methanol", ["MEOH"] = "Methanol",
+            ["METHYLLINOLEATE"] = "MethylLinoleate", ["METHYLLINOLENATE"] = "MethylLinolenate",
+            ["METHYLOLEATE"] = "MethylOleate", ["METHYLPALMITATE"] = "MethylPalmitate",
+            ["METHYLSTEARATE"] = "MethylStearate",
+            ["MM"] = "MM",
+            ["NBUTANE"] = "n-Butane", ["BUTANE"] = "n-Butane",
+            ["NDECANE"] = "n-Decane", ["DECANE"] = "n-Decane",
+            ["NDODECANE"] = "n-Dodecane", ["DODECANE"] = "n-Dodecane",
+            ["NHEPTANE"] = "n-Heptane", ["HEPTANE"] = "n-Heptane",
+            ["NHEXANE"] = "n-Hexane", ["HEXANE"] = "n-Hexane",
+            ["NNONANE"] = "n-Nonane", ["NONANE"] = "n-Nonane",
+            ["NOCTANE"] = "n-Octane", ["OCTANE"] = "n-Octane",
+            ["NPENTANE"] = "n-Pentane", ["PENTANE"] = "n-Pentane",
+            ["NPROPANE"] = "n-Propane", ["PROPANE"] = "n-Propane",
+            ["NUNDECANE"] = "n-Undecane", ["UNDECANE"] = "n-Undecane",
+            ["NEON"] = "Neon", ["NE"] = "Neon",
+            ["NEOPENTANE"] = "Neopentane",
+            ["NITROGEN"] = "Nitrogen", ["N2"] = "Nitrogen",
+            ["NITROUSOXIDE"] = "NitrousOxide", ["N2O"] = "NitrousOxide",
+            ["NOVEC649"] = "Novec649",
+            ["OXYLENE"] = "o-Xylene",
+            ["ORTHODEUTERIUM"] = "OrthoDeuterium", ["ORTHOHYDROGEN"] = "OrthoHydrogen",
+            ["OXYGEN"] = "Oxygen", ["O2"] = "Oxygen",
+            ["PXYLENE"] = "p-Xylene",
+            ["PARADEUTERIUM"] = "ParaDeuterium", ["PARAHYDROGEN"] = "ParaHydrogen",
+            ["PROPYLENE"] = "Propylene", ["C3H6"] = "Propylene",
+            ["PROPYNE"] = "Propyne",
+            // Refrigerants
+            ["R11"] = "R11", ["R113"] = "R113", ["R114"] = "R114", ["R115"] = "R115",
+            ["R116"] = "R116", ["R12"] = "R12", ["R123"] = "R123",
+            ["R1233ZDE"] = "R1233zd(E)", ["R1233ZD(E)"] = "R1233zd(E)",
+            ["R1234YF"] = "R1234yf",
+            ["R1234ZEE"] = "R1234ze(E)", ["R1234ZE(E)"] = "R1234ze(E)",
+            ["R1234ZEZ"] = "R1234ze(Z)", ["R1234ZE(Z)"] = "R1234ze(Z)",
+            ["R124"] = "R124", ["R125"] = "R125", ["R13"] = "R13",
+            ["R134A"] = "R134a", ["R13I1"] = "R13I1", ["R14"] = "R14",
+            ["R141B"] = "R141b", ["R142B"] = "R142b", ["R143A"] = "R143a",
+            ["R152A"] = "R152A", ["R161"] = "R161", ["R21"] = "R21",
+            ["R218"] = "R218", ["R22"] = "R22", ["R227EA"] = "R227EA",
+            ["R23"] = "R23", ["R236EA"] = "R236EA", ["R236FA"] = "R236FA",
+            ["R245CA"] = "R245ca", ["R245FA"] = "R245fa", ["R32"] = "R32",
+            ["R365MFC"] = "R365MFC", ["R40"] = "R40",
+            ["R404A"] = "R404A", ["R407C"] = "R407C", ["R41"] = "R41",
+            ["R410A"] = "R410A", ["R507A"] = "R507A",
+            ["RC318"] = "RC318",
+            ["SES36"] = "SES36",
+            ["SULFURDIOXIDE"] = "SulfurDioxide", ["SO2"] = "SulfurDioxide",
+            ["SULFURHEXAFLUORIDE"] = "SulfurHexafluoride", ["SF6"] = "SulfurHexafluoride",
+            ["TOLUENE"] = "Toluene",
+            ["TRANS2BUTENE"] = "trans-2-Butene",
+            ["WATER"] = "Water", ["H2O"] = "Water",
+            ["XENON"] = "Xenon", ["XE"] = "Xenon"
+        };
+
+        // Initialize humid air property mappings
+        HumidAirPropertyMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["B"] = "Twb", ["TWB"] = "Twb", ["T_WB"] = "Twb", ["WETBULB"] = "Twb", ["WETBULBTEMP"] = "Twb", ["WETBULBTEMPERATURE"] = "Twb",
+            ["C"] = "Cda", ["CP"] = "Cda", ["CDA"] = "Cda", ["CPDA"] = "Cda", ["CP_DA"] = "Cda",
+            ["CHA"] = "Cha", ["CPHA"] = "Cha", ["CP_HA"] = "Cha",
+            ["CV"] = "CV", ["CVMASS"] = "CV",
+            ["CVHA"] = "CVha", ["CV_HA"] = "CVha",
+            ["D"] = "Tdp", ["TDP"] = "Tdp", ["T_DP"] = "Tdp", ["DEWPOINT"] = "Tdp", ["DEWPOINTTEMP"] = "Tdp", ["DEWPOINTTEMPERATURE"] = "Tdp",
+            ["H"] = "Hda", ["HDA"] = "Hda", ["H_DA"] = "Hda", ["ENTHALPY"] = "Hda",
+            ["HHA"] = "Hha", ["H_HA"] = "Hha",
+            ["K"] = "K", ["CONDUCTIVITY"] = "K", ["THERMALCONDUCTIVITY"] = "K",
+            ["M"] = "MU", ["MU"] = "MU", ["VISC"] = "MU", ["VISCOSITY"] = "MU", ["DYNAMICVISCOSITY"] = "MU",
+            ["PSI_W"] = "Psi_w", ["PSIW"] = "Psi_w", ["Y"] = "Psi_w",
+            ["P"] = "P", ["PRESSURE"] = "P", ["PRES"] = "P",
+            ["P_W"] = "P_w", ["PW"] = "P_w", ["PARTIALPRESSURE"] = "P_w", ["WATERPRESSURE"] = "P_w",
+            ["R"] = "R", ["RH"] = "R", ["RELHUM"] = "R", ["RELATIVEHUMIDITY"] = "R",
+            ["S"] = "Sda", ["SDA"] = "Sda", ["S_DA"] = "Sda", ["ENTROPY"] = "Sda",
+            ["SHA"] = "Sha", ["S_HA"] = "Sha",
+            ["T"] = "T", ["TDB"] = "T", ["T_DB"] = "T", ["TEMP"] = "T", ["TEMPERATURE"] = "T", ["DRYBULB"] = "T", ["DRYBULBTEMP"] = "T", ["DRYBULBTEMPERATURE"] = "T",
+            ["V"] = "Vda", ["VDA"] = "Vda", ["V_DA"] = "Vda",
+            ["VHA"] = "Vha", ["V_HA"] = "Vha",
+            ["W"] = "W", ["OMEGA"] = "W", ["HUMRAT"] = "W", ["HUMIDITYRATIO"] = "W", ["MIXINGRATIO"] = "W",
+            ["Z"] = "Z", ["COMPRESSIBILITY"] = "Z", ["COMPRESSIBILITYFACTOR"] = "Z"
+        };
+
+        // Properties requiring temperature conversion (°C <-> K)
+        TemperatureProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "T", "Tcrit", "Tmax", "Tmin", "Ttriple", "T_freeze", "T_reducing", "Twb", "Tdp"
+        };
+
+        // Properties requiring pressure conversion (bar <-> Pa)
+        PressureProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "P", "Pcrit", "pmax", "pmin", "ptriple", "p_reducing", "P_w"
+        };
+
+        // Properties requiring energy conversion (kJ <-> J)
+        EnergyProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "H", "Hmolar", "U", "Umolar", "S", "Smolar", "Smolar_residual",
+            "Cpmass", "Cvmass", "Cpmolar", "Cvmolar", "Cp0mass", "Cp0molar",
+            "G", "Gmolar", "Hda", "Hha", "Sda", "Sha", "Cda", "Cha"
+        };
+
+        LoadCoolPropDll();
+    }
     // Windows API for LoadLibrary and SetDllDirectory
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr LoadLibrary(string dllToLoad);
@@ -19,12 +270,6 @@ public static class CoolPropWrapper
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool AddDllDirectory(string NewDirectory);
-
-    // Static constructor to load CoolProp.dll
-    static CoolPropWrapper()
-    {
-        LoadCoolPropDll();
-    }
 
     private static void LoadCoolPropDll()
     {
@@ -358,16 +603,16 @@ public static class CoolPropWrapper
     }
 
     // Function to calculate thermodynamic properties using SI units (no conversion)
-    [ExcelFunction(Name = "PropsSI", Description = "Calculate thermodynamic properties of real fluids using CoolProp with SI units (K, Pa, J/kg, etc.).")]
+    [ExcelFunction(Name = "PropsSI", Description = "Calculate thermodynamic properties of real fluids using CoolProp with SI units (K, Pa, J/kg, etc.). Supports array inputs for value1 and/or value2.")]
     public static object PropsSI(string output, string name1, object value1, string name2, object value2, string fluid)
     {
-        // Check for missing or invalid inputs
+        // Check for missing or invalid inputs (strings)
         if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
         if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
-        if (value1 == null || !(value1 is double)) return "Error: First property value is missing or not a number.";
         if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
-        if (value2 == null || !(value2 is double)) return "Error: Second property value is missing or not a number.";
         if (string.IsNullOrWhiteSpace(fluid)) return "Error: Fluid name is missing.";
+        if (value1 == null) return "Error: First property value is missing.";
+        if (value2 == null) return "Error: Second property value is missing.";
 
         // Normalize parameter names and fluid name
         name1 = FormatName(name1);
@@ -375,46 +620,157 @@ public static class CoolPropWrapper
         output = FormatName(output);
         fluid = FormatFluidName(fluid);
 
-        // Call CoolProp directly with SI units (no conversion)
-        double result;
+        // Check if either input is an array
+        bool isValue1Array = IsArrayInput(value1);
+        bool isValue2Array = IsArrayInput(value2);
+
+        // If neither is an array, handle as a single value (original behavior)
+        if (!isValue1Array && !isValue2Array)
+        {
+            if (!(value1 is double)) return "Error: First property value is not a number.";
+            if (!(value2 is double)) return "Error: Second property value is not a number.";
+
+            // Call CoolProp directly with SI units (no conversion)
+            double result;
+            try
+            {
+                result = PropsSI_Internal(output, name1, (double)value1, name2, (double)value2, fluid);
+            }
+            catch (DllNotFoundException ex)
+            {
+                return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
+            }
+
+            // Check if the result indicates an error
+            if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+            {
+                return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
+            }
+
+            // Return result in SI units (no conversion)
+            return result;
+        }
+
+        // Handle array inputs
         try
         {
-            result = PropsSI_Internal(output, name1, (double)value1, name2, (double)value2, fluid);
+            double[] values1;
+            double[] values2;
+
+            // Extract arrays or convert single values to arrays
+            if (isValue1Array)
+            {
+                values1 = ExtractDoubleArray(value1);
+            }
+            else
+            {
+                if (!(value1 is double)) return "Error: First property value is not a number.";
+                values1 = new double[] { (double)value1 };
+            }
+
+            if (isValue2Array)
+            {
+                values2 = ExtractDoubleArray(value2);
+            }
+            else
+            {
+                if (!(value2 is double)) return "Error: Second property value is not a number.";
+                values2 = new double[] { (double)value2 };
+            }
+
+            // Check if both are arrays and have the same length
+            if (isValue1Array && isValue2Array && values1.Length != values2.Length)
+            {
+                return $"Error: Array lengths must match. value1 has {values1.Length} elements, value2 has {values2.Length} elements.";
+            }
+
+            // Determine the result array length
+            int resultLength = Math.Max(values1.Length, values2.Length);
+            double[] results = new double[resultLength];
+
+            // Calculate properties for each pair
+            for (int i = 0; i < resultLength; i++)
+            {
+                double val1 = values1[isValue1Array ? i : 0];
+                double val2 = values2[isValue2Array ? i : 0];
+
+                // Call CoolProp directly (SI units, no conversion)
+                double result;
+                try
+                {
+                    result = PropsSI_Internal(output, name1, val1, name2, val2, fluid);
+                }
+                catch (Exception ex)
+                {
+                    return $"Error at index {i}: {ex.Message}. CoolProp error: {GetCoolPropError()}";
+                }
+
+                // Check if the result indicates an error
+                if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+                {
+                    return $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
+                }
+
+                results[i] = result;
+            }
+
+            // Determine output orientation based on input orientation
+            bool outputAsRow = (isValue1Array && IsRowArray(value1)) || (isValue2Array && IsRowArray(value2));
+            
+            object[,] outputArray;
+            if (outputAsRow)
+            {
+                // Return as a row array (1 row, multiple columns)
+                outputArray = new object[1, resultLength];
+                for (int i = 0; i < resultLength; i++)
+                {
+                    outputArray[0, i] = results[i];
+                }
+            }
+            else
+            {
+                // Return as a column array (multiple rows, 1 column)
+                outputArray = new object[resultLength, 1];
+                for (int i = 0; i < resultLength; i++)
+                {
+                    outputArray[i, 0] = results[i];
+                }
+            }
+            return outputArray;
         }
-        catch (DllNotFoundException ex)
+        catch (InvalidCastException ex)
         {
-            return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+            return $"Error: {ex.Message}";
         }
-        catch (EntryPointNotFoundException ex)
+        catch (ArgumentException ex)
         {
-            return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+            return $"Error: {ex.Message}";
         }
         catch (Exception ex)
         {
-            return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
+            return $"Error processing array inputs: {ex.Message}";
         }
-
-        // Check if the result indicates an error (CoolProp returns large values or NaN on error)
-        if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
-        {
-            return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
-        }
-
-        // Return result in SI units (no conversion)
-        return result;
     }
 
     // Function to calculate thermodynamic properties using engineering units
-    [ExcelFunction(Name = "Props", Description = "Calculate thermodynamic properties of real fluids using CoolProp with engineering units (°C, bar, kJ/kg, etc.).")]
+    [ExcelFunction(Name = "Props", Description = "Calculate thermodynamic properties of real fluids using CoolProp with engineering units (°C, bar, kJ/kg, etc.). Supports array inputs for value1 and/or value2.")]
     public static object Props(string output, string name1, object value1, string name2, object value2, string fluid)
     {
-        // Check for missing or invalid inputs
+        // Check for missing or invalid inputs (strings)
         if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
         if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
-        if (value1 == null || !(value1 is double)) return "Error: First property value is missing or not a number.";
         if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
-        if (value2 == null || !(value2 is double)) return "Error: Second property value is missing or not a number.";
         if (string.IsNullOrWhiteSpace(fluid)) return "Error: Fluid name is missing.";
+        if (value1 == null) return "Error: First property value is missing.";
+        if (value2 == null) return "Error: Second property value is missing.";
 
         // Normalize parameter names and fluid name
         name1 = FormatName(name1);
@@ -422,37 +778,153 @@ public static class CoolPropWrapper
         output = FormatName(output);
         fluid = FormatFluidName(fluid);
 
-        // Convert inputs to SI units
-        double val1SI = ConvertToSI(name1, (double)value1);
-        double val2SI = ConvertToSI(name2, (double)value2);
+        // Check if either input is an array
+        bool isValue1Array = IsArrayInput(value1);
+        bool isValue2Array = IsArrayInput(value2);
 
-        // Call CoolProp for the requested property
-        double result;
+        // If neither is an array, handle as a single value (original behavior)
+        if (!isValue1Array && !isValue2Array)
+        {
+            if (!(value1 is double)) return "Error: First property value is not a number.";
+            if (!(value2 is double)) return "Error: Second property value is not a number.";
+
+            // Convert inputs to SI units
+            double val1SI = ConvertToSI(name1, (double)value1);
+            double val2SI = ConvertToSI(name2, (double)value2);
+
+            // Call CoolProp for the requested property
+            double result;
+            try
+            {
+                result = PropsSI_Internal(output, name1, val1SI, name2, val2SI, fluid);
+            }
+            catch (DllNotFoundException ex)
+            {
+                return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
+            }
+
+            // Check if the result indicates an error
+            if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+            {
+                return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
+            }
+
+            // Convert output to engineering units
+            return ConvertFromSI(output, result);
+        }
+
+        // Handle array inputs
         try
         {
-            result = PropsSI_Internal(output, name1, val1SI, name2, val2SI, fluid);
+            double[] values1;
+            double[] values2;
+
+            // Extract arrays or convert single values to arrays
+            if (isValue1Array)
+            {
+                values1 = ExtractDoubleArray(value1);
+            }
+            else
+            {
+                if (!(value1 is double)) return "Error: First property value is not a number.";
+                values1 = new double[] { (double)value1 };
+            }
+
+            if (isValue2Array)
+            {
+                values2 = ExtractDoubleArray(value2);
+            }
+            else
+            {
+                if (!(value2 is double)) return "Error: Second property value is not a number.";
+                values2 = new double[] { (double)value2 };
+            }
+
+            // Check if both are arrays and have the same length
+            if (isValue1Array && isValue2Array && values1.Length != values2.Length)
+            {
+                return $"Error: Array lengths must match. value1 has {values1.Length} elements, value2 has {values2.Length} elements.";
+            }
+
+            // Determine the result array length
+            int resultLength = Math.Max(values1.Length, values2.Length);
+            double[] results = new double[resultLength];
+
+            // Calculate properties for each pair
+            for (int i = 0; i < resultLength; i++)
+            {
+                double val1 = values1[isValue1Array ? i : 0];
+                double val2 = values2[isValue2Array ? i : 0];
+
+                // Convert inputs to SI units
+                double val1SI = ConvertToSI(name1, val1);
+                double val2SI = ConvertToSI(name2, val2);
+
+                // Call CoolProp for the requested property
+                double result;
+                try
+                {
+                    result = PropsSI_Internal(output, name1, val1SI, name2, val2SI, fluid);
+                }
+                catch (Exception ex)
+                {
+                    return $"Error at index {i}: {ex.Message}. CoolProp error: {GetCoolPropError()}";
+                }
+
+                // Check if the result indicates an error
+                if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+                {
+                    return $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
+                }
+
+                // Convert output to engineering units
+                results[i] = ConvertFromSI(output, result);
+            }
+
+            // Determine output orientation based on input orientation
+            bool outputAsRow = (isValue1Array && IsRowArray(value1)) || (isValue2Array && IsRowArray(value2));
+            
+            object[,] outputArray;
+            if (outputAsRow)
+            {
+                // Return as a row array (1 row, multiple columns)
+                outputArray = new object[1, resultLength];
+                for (int i = 0; i < resultLength; i++)
+                {
+                    outputArray[0, i] = results[i];
+                }
+            }
+            else
+            {
+                // Return as a column array (multiple rows, 1 column)
+                outputArray = new object[resultLength, 1];
+                for (int i = 0; i < resultLength; i++)
+                {
+                    outputArray[i, 0] = results[i];
+                }
+            }
+            return outputArray;
         }
-        catch (DllNotFoundException ex)
+        catch (InvalidCastException ex)
         {
-            return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+            return $"Error: {ex.Message}";
         }
-        catch (EntryPointNotFoundException ex)
+        catch (ArgumentException ex)
         {
-            return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+            return $"Error: {ex.Message}";
         }
         catch (Exception ex)
         {
-            return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
+            return $"Error processing array inputs: {ex.Message}";
         }
-
-        // Check if the result indicates an error (CoolProp returns large values or NaN on error)
-        if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
-        {
-            return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
-        }
-
-        // Convert output to engineering units
-        return ConvertFromSI(output, result);
     }
 
     // TMPr alias for Props (uses engineering units)
@@ -462,17 +934,17 @@ public static class CoolPropWrapper
         return Props(output, name1, value1, name2, value2, fluid);
     }
 
-    [ExcelFunction(Name = "HAPropsSI", Description = "Calculate thermodynamic properties of humid air using CoolProp with SI units (K, Pa, J/kg, etc.).")]
+    [ExcelFunction(Name = "HAPropsSI", Description = "Calculate thermodynamic properties of humid air using CoolProp with SI units (K, Pa, J/kg, etc.). Supports array inputs.")]
     public static object HAPropsSI(string output, string name1, object value1, string name2, object value2, string name3, object value3)
     {
-        // Check for missing or invalid inputs
+        // Check for missing or invalid inputs (strings)
         if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
         if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
-        if (value1 == null || !(value1 is double)) return "Error: First property value is missing or not a number.";
         if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
-        if (value2 == null || !(value2 is double)) return "Error: Second property value is missing or not a number.";
         if (string.IsNullOrWhiteSpace(name3)) return "Error: Third property name is missing.";
-        if (value3 == null || !(value3 is double)) return "Error: Third property value is missing or not a number.";
+        if (value1 == null) return "Error: First property value is missing.";
+        if (value2 == null) return "Error: Second property value is missing.";
+        if (value3 == null) return "Error: Third property value is missing.";
 
         // Normalize parameter names
         name1 = FormatName_HA(name1);
@@ -480,46 +952,166 @@ public static class CoolPropWrapper
         name3 = FormatName_HA(name3);
         output = FormatName_HA(output);
 
-        // Call CoolProp directly with SI units (no conversion)
-        double result;
+        // Check if any input is an array
+        bool isValue1Array = IsArrayInput(value1);
+        bool isValue2Array = IsArrayInput(value2);
+        bool isValue3Array = IsArrayInput(value3);
+
+        // If none is an array, handle as a single value (original behavior)
+        if (!isValue1Array && !isValue2Array && !isValue3Array)
+        {
+            if (!(value1 is double)) return "Error: First property value is not a number.";
+            if (!(value2 is double)) return "Error: Second property value is not a number.";
+            if (!(value3 is double)) return "Error: Third property value is not a number.";
+
+            // Call CoolProp directly with SI units (no conversion)
+            double result;
+            try
+            {
+                result = HAPropsSI_Internal(output, name1, (double)value1, name2, (double)value2, name3, (double)value3);
+            }
+            catch (DllNotFoundException ex)
+            {
+                return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
+            }
+
+            // Check if the result indicates an error
+            if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+            {
+                return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
+            }
+
+            // Return result in SI units (no conversion)
+            return result;
+        }
+
+        // Handle array inputs
         try
         {
-            result = HAPropsSI_Internal(output, name1, (double)value1, name2, (double)value2, name3, (double)value3);
+            double[] values1, values2, values3;
+
+            // Extract arrays or convert single values to arrays
+            if (isValue1Array)
+                values1 = ExtractDoubleArray(value1);
+            else
+            {
+                if (!(value1 is double)) return "Error: First property value is not a number.";
+                values1 = new double[] { (double)value1 };
+            }
+
+            if (isValue2Array)
+                values2 = ExtractDoubleArray(value2);
+            else
+            {
+                if (!(value2 is double)) return "Error: Second property value is not a number.";
+                values2 = new double[] { (double)value2 };
+            }
+
+            if (isValue3Array)
+                values3 = ExtractDoubleArray(value3);
+            else
+            {
+                if (!(value3 is double)) return "Error: Third property value is not a number.";
+                values3 = new double[] { (double)value3 };
+            }
+
+            // Check if all arrays have the same length
+            int resultLength = Math.Max(Math.Max(values1.Length, values2.Length), values3.Length);
+            if ((isValue1Array && values1.Length != resultLength && values1.Length > 1) ||
+                (isValue2Array && values2.Length != resultLength && values2.Length > 1) ||
+                (isValue3Array && values3.Length != resultLength && values3.Length > 1))
+            {
+                return $"Error: All array inputs must have the same length. Lengths: value1={values1.Length}, value2={values2.Length}, value3={values3.Length}";
+            }
+
+            double[] results = new double[resultLength];
+
+            // Calculate properties for each set
+            for (int i = 0; i < resultLength; i++)
+            {
+                double val1 = values1[isValue1Array ? Math.Min(i, values1.Length - 1) : 0];
+                double val2 = values2[isValue2Array ? Math.Min(i, values2.Length - 1) : 0];
+                double val3 = values3[isValue3Array ? Math.Min(i, values3.Length - 1) : 0];
+
+                // Call CoolProp directly (SI units, no conversion)
+                double result;
+                try
+                {
+                    result = HAPropsSI_Internal(output, name1, val1, name2, val2, name3, val3);
+                }
+                catch (Exception ex)
+                {
+                    return $"Error at index {i}: {ex.Message}. CoolProp error: {GetCoolPropError()}";
+                }
+
+                // Check if the result indicates an error
+                if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+                {
+                    return $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
+                }
+
+                results[i] = result;
+            }
+
+            // Determine output orientation based on input orientation
+            bool outputAsRow = (isValue1Array && IsRowArray(value1)) || 
+                              (isValue2Array && IsRowArray(value2)) || 
+                              (isValue3Array && IsRowArray(value3));
+            
+            object[,] outputArray;
+            if (outputAsRow)
+            {
+                // Return as a row array (1 row, multiple columns)
+                outputArray = new object[1, resultLength];
+                for (int i = 0; i < resultLength; i++)
+                {
+                    outputArray[0, i] = results[i];
+                }
+            }
+            else
+            {
+                // Return as a column array (multiple rows, 1 column)
+                outputArray = new object[resultLength, 1];
+                for (int i = 0; i < resultLength; i++)
+                {
+                    outputArray[i, 0] = results[i];
+                }
+            }
+            return outputArray;
         }
-        catch (DllNotFoundException ex)
+        catch (InvalidCastException ex)
         {
-            return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+            return $"Error: {ex.Message}";
         }
-        catch (EntryPointNotFoundException ex)
+        catch (ArgumentException ex)
         {
-            return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+            return $"Error: {ex.Message}";
         }
         catch (Exception ex)
         {
-            return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
+            return $"Error processing array inputs: {ex.Message}";
         }
-
-        // Check if the result indicates an error (CoolProp returns large values or NaN on error)
-        if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
-        {
-            return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
-        }
-
-        // Return result in SI units (no conversion)
-        return result;
     }
 
-    [ExcelFunction(Name = "HAProps", Description = "Calculate thermodynamic properties of humid air using CoolProp with engineering units (°C, bar, kJ/kg, etc.).")]
+    [ExcelFunction(Name = "HAProps", Description = "Calculate thermodynamic properties of humid air using CoolProp with engineering units (°C, bar, kJ/kg, etc.). Supports array inputs.")]
     public static object HAProps(string output, string name1, object value1, string name2, object value2, string name3, object value3)
     {
-        // Check for missing or invalid inputs
+        // Check for missing or invalid inputs (strings)
         if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
         if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
-        if (value1 == null || !(value1 is double)) return "Error: First property value is missing or not a number.";
         if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
-        if (value2 == null || !(value2 is double)) return "Error: Second property value is missing or not a number.";
         if (string.IsNullOrWhiteSpace(name3)) return "Error: Third property name is missing.";
-        if (value3 == null || !(value3 is double)) return "Error: Third property value is missing or not a number.";
+        if (value1 == null) return "Error: First property value is missing.";
+        if (value2 == null) return "Error: Second property value is missing.";
+        if (value3 == null) return "Error: Third property value is missing.";
 
         // Normalize parameter names
         name1 = FormatName_HA(name1);
@@ -527,38 +1119,164 @@ public static class CoolPropWrapper
         name3 = FormatName_HA(name3);
         output = FormatName_HA(output);
 
-        // Convert inputs to SI units
-        double val1SI = ConvertToSI_HA(name1, (double)value1);
-        double val2SI = ConvertToSI_HA(name2, (double)value2);
-        double val3SI = ConvertToSI_HA(name3, (double)value3);
+        // Check if any input is an array
+        bool isValue1Array = IsArrayInput(value1);
+        bool isValue2Array = IsArrayInput(value2);
+        bool isValue3Array = IsArrayInput(value3);
 
-        // Call CoolProp for the requested property
-        double result;
+        // If none is an array, handle as a single value (original behavior)
+        if (!isValue1Array && !isValue2Array && !isValue3Array)
+        {
+            if (!(value1 is double)) return "Error: First property value is not a number.";
+            if (!(value2 is double)) return "Error: Second property value is not a number.";
+            if (!(value3 is double)) return "Error: Third property value is not a number.";
+
+            // Convert inputs to SI units
+            double val1SI = ConvertToSI_HA(name1, (double)value1);
+            double val2SI = ConvertToSI_HA(name2, (double)value2);
+            double val3SI = ConvertToSI_HA(name3, (double)value3);
+
+            // Call CoolProp for the requested property
+            double result;
+            try
+            {
+                result = HAPropsSI_Internal(output, name1, val1SI, name2, val2SI, name3, val3SI);
+            }
+            catch (DllNotFoundException ex)
+            {
+                return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
+            }
+
+            // Check if the result indicates an error
+            if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+            {
+                return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
+            }
+
+            // Convert output to engineering units
+            return ConvertFromSI_HA(output, result);
+        }
+
+        // Handle array inputs
         try
         {
-            result = HAPropsSI_Internal(output, name1, val1SI, name2, val2SI, name3, val3SI);
+            double[] values1, values2, values3;
+
+            // Extract arrays or convert single values to arrays
+            if (isValue1Array)
+                values1 = ExtractDoubleArray(value1);
+            else
+            {
+                if (!(value1 is double)) return "Error: First property value is not a number.";
+                values1 = new double[] { (double)value1 };
+            }
+
+            if (isValue2Array)
+                values2 = ExtractDoubleArray(value2);
+            else
+            {
+                if (!(value2 is double)) return "Error: Second property value is not a number.";
+                values2 = new double[] { (double)value2 };
+            }
+
+            if (isValue3Array)
+                values3 = ExtractDoubleArray(value3);
+            else
+            {
+                if (!(value3 is double)) return "Error: Third property value is not a number.";
+                values3 = new double[] { (double)value3 };
+            }
+
+            // Check if all arrays have the same length
+            int resultLength = Math.Max(Math.Max(values1.Length, values2.Length), values3.Length);
+            if ((isValue1Array && values1.Length != resultLength && values1.Length > 1) ||
+                (isValue2Array && values2.Length != resultLength && values2.Length > 1) ||
+                (isValue3Array && values3.Length != resultLength && values3.Length > 1))
+            {
+                return $"Error: All array inputs must have the same length. Lengths: value1={values1.Length}, value2={values2.Length}, value3={values3.Length}";
+            }
+
+            double[] results = new double[resultLength];
+
+            // Calculate properties for each set
+            for (int i = 0; i < resultLength; i++)
+            {
+                double val1 = values1[isValue1Array ? Math.Min(i, values1.Length - 1) : 0];
+                double val2 = values2[isValue2Array ? Math.Min(i, values2.Length - 1) : 0];
+                double val3 = values3[isValue3Array ? Math.Min(i, values3.Length - 1) : 0];
+
+                // Convert inputs to SI units
+                double val1SI = ConvertToSI_HA(name1, val1);
+                double val2SI = ConvertToSI_HA(name2, val2);
+                double val3SI = ConvertToSI_HA(name3, val3);
+
+                // Call CoolProp for the requested property
+                double result;
+                try
+                {
+                    result = HAPropsSI_Internal(output, name1, val1SI, name2, val2SI, name3, val3SI);
+                }
+                catch (Exception ex)
+                {
+                    return $"Error at index {i}: {ex.Message}. CoolProp error: {GetCoolPropError()}";
+                }
+
+                // Check if the result indicates an error
+                if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
+                {
+                    return $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
+                }
+
+                // Convert output to engineering units
+                results[i] = ConvertFromSI_HA(output, result);
+            }
+
+            // Determine output orientation based on input orientation
+            bool outputAsRow = (isValue1Array && IsRowArray(value1)) || 
+                              (isValue2Array && IsRowArray(value2)) || 
+                              (isValue3Array && IsRowArray(value3));
+            
+            object[,] outputArray;
+            if (outputAsRow)
+            {
+                // Return as a row array (1 row, multiple columns)
+                outputArray = new object[1, resultLength];
+                for (int i = 0; i < resultLength; i++)
+                {
+                    outputArray[0, i] = results[i];
+                }
+            }
+            else
+            {
+                // Return as a column array (multiple rows, 1 column)
+                outputArray = new object[resultLength, 1];
+                for (int i = 0; i < resultLength; i++)
+                {
+                    outputArray[i, 0] = results[i];
+                }
+            }
+            return outputArray;
         }
-        catch (DllNotFoundException ex)
+        catch (InvalidCastException ex)
         {
-            return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+            return $"Error: {ex.Message}";
         }
-        catch (EntryPointNotFoundException ex)
+        catch (ArgumentException ex)
         {
-            return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+            return $"Error: {ex.Message}";
         }
         catch (Exception ex)
         {
-            return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
+            return $"Error processing array inputs: {ex.Message}";
         }
-
-        // Check if the result indicates an error (CoolProp returns large values or NaN on error)
-        if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
-        {
-            return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
-        }
-
-        // Convert output to engineering units
-        return ConvertFromSI_HA(output, result);
     }
 
     // TMPa alias for HAProps (uses engineering units)
@@ -812,871 +1530,168 @@ public static class CoolPropWrapper
         }
     }
 
-
-    // Normalize name capitalization to match the expected format (comprehensive parameter list)
-    private static string FormatName(string name)
+    // Helper functions for array detection and extraction
+    private static bool IsArrayInput(object input)
     {
-        switch (name.ToUpper())
-        {
-            // Temperature
-            case "T":
-            case "TEMP":
-            case "TEMPERATURE":
-                return "T";
-            
-            // Pressure
-            case "P":
-            case "PRES":
-            case "PRESSURE":
-                return "P";
-            
-            // Enthalpy
-            case "H":
-            case "ENTH":
-            case "ENTHALPY":
-            case "HMASS":
-            case "H_MASS":
-                return "H";
-            case "HMOLAR":
-            case "H_MOLAR":
-                return "Hmolar";
-            
-            // Internal Energy
-            case "U":
-            case "INTERNALENERGY":
-            case "UMASS":
-            case "U_MASS":
-                return "U";
-            case "UMOLAR":
-            case "U_MOLAR":
-                return "Umolar";
-            
-            // Entropy
-            case "S":
-            case "ENTR":
-            case "ENTROPY":
-            case "SMASS":
-            case "S_MASS":
-                return "S";
-            case "SMOLAR":
-            case "S_MOLAR":
-                return "Smolar";
-            case "SMOLAR_RESIDUAL":
-            case "SMOLARRESIDUAL":
-                return "Smolar_residual";
-            
-            // Density
-            case "D":
-            case "RHO":
-            case "DENS":
-            case "DENSITY":
-            case "DMASS":
-            case "D_MASS":
-            case "RHOMASS":
-                return "D";
-            case "DMOLAR":
-            case "RHOMOLAR":
-            case "DMOL":
-            case "D_MOL":
-            case "D_MOLAR":
-                return "Dmolar";
-            
-            // Specific Heat Capacity
-            case "CVMASS":
-            case "CV":
-                return "Cvmass";
-            case "CPMASS":
-            case "CP":
-            case "C":
-                return "Cpmass";
-            case "CPMOLAR":
-            case "CPMOL":
-                return "Cpmolar";
-            case "CVMOLAR":
-            case "CVMOL":
-                return "Cvmolar";
-            case "CP0MASS":
-                return "Cp0mass";
-            case "CP0MOLAR":
-                return "Cp0molar";
-            
-            // Quality (vapor fraction)
-            case "Q":
-            case "QUALITY":
-            case "X":
-            case "VAPORFRACTION":
-            case "VAPOR_FRACTION":
-                return "Q";
-            
-            // Reduced properties
-            case "TAU":
-                return "Tau";
-            case "DELTA":
-                return "Delta";
-            
-            // Helmholtz energy derivatives
-            case "ALPHA0":
-                return "Alpha0";
-            case "ALPHAR":
-                return "Alphar";
-            case "DALPHA0_DDELTA_CONSTTAU":
-            case "DALPHA0_DDELTA":
-                return "DALPHA0_DDELTA_CONSTTAU";
-            case "DALPHA0_DTAU_CONSTDELTA":
-            case "DALPHA0_DTAU":
-                return "DALPHA0_DTAU_CONSTDELTA";
-            case "DALPHAR_DDELTA_CONSTTAU":
-            case "DALPHAR_DDELTA":
-                return "DALPHAR_DDELTA_CONSTTAU";
-            case "DALPHAR_DTAU_CONSTDELTA":
-            case "DALPHAR_DTAU":
-                return "DALPHAR_DTAU_CONSTDELTA";
-            
-            // Speed of sound
-            case "SPEED_OF_SOUND":
-            case "SPEEDOFSOUND":
-            case "A":
-            case "W":
-                return "A";
-            
-            // Virial coefficients
-            case "BVIRIAL":
-                return "Bvirial";
-            case "CVIRIAL":
-                return "Cvirial";
-            case "DBVIRIAL_DT":
-            case "DBVIRIAL":
-            case "DBVIRIALDT":
-                return "DBVIRIAL_DT";
-            case "DCVIRIAL_DT":
-            case "DCVIRIAL":
-            case "DCVIRIALDT":
-                return "DCVIRIAL_DT";
-            
-            // Conductivity
-            case "K":
-            case "CONDUCTIVITY":
-            case "L":
-                return "conductivity";
-            
-            // Dipole moment
-            case "DIPOLE_MOMENT":
-            case "DIPOLEMOMENT":
-            case "DIPOLE":
-                return "DIPOLE_MOMENT";
-            
-            // Gibbs energy
-            case "G":
-            case "GMASS":
-            case "GIBBS":
-                return "G";
-            case "GMOLAR":
-                return "Gmolar";
-            
-            // Helmholtz energy
-            case "HELMHOLTZMASS":
-                return "HELMHOLTZMASS";
-            case "HELMHOLTZMOLAR":
-                return "HELMHOLTZMOLAR";
-            
-            // Isentropic expansion coefficient
-            case "GAMMA":
-            case "ISENTROPICEXPANSIONCOEFFICIENT":
-                return "isentropic_expansion_coefficient";
-            
-            // Expansion and compressibility
-            case "ISOBARIC_EXPANSION_COEFFICIENT":
-            case "ISOBARICEXPANSION":
-            case "ISOBARICEXPANSIONCOEFFICIENT":
-                return "isobaric_expansion_coefficient";
-            case "ISOTHERMAL_COMPRESSIBILITY":
-            case "ISOTHERMALCOMPRESSIBILITY":
-                return "isothermal_compressibility";
-            
-            // Surface tension
-            case "SURFACE_TENSION":
-            case "SURFACETENSION":
-            case "SIGMA":
-            case "I":
-                return "surface_tension";
-            
-            // Molar mass
-            case "MM":
-            case "MOLAR_MASS":
-            case "MOLARMASS":
-            case "MOLEMASS":
-                return "M";
-            
-            // Critical properties
-            case "PCRIT":
-            case "P_CRITICAL":
-            case "PCRITICAL":
-                return "Pcrit";
-            case "TCRIT":
-            case "T_CRITICAL":
-            case "TCRITICAL":
-                return "Tcrit";
-            case "RHOCRIT":
-            case "RHOCRITICAL":
-            case "DCRIT":
-                return "rhocrit";
-            case "RHOMASS_CRITICAL":
-            case "RHOMASSCRITICAL":
-                return "rhomass_critical";
-            case "RHOMOLAR_CRITICAL":
-            case "RHOMOLARCRITICAL":
-                return "rhomolar_critical";
-            
-            // Phase
-            case "PHASE":
-                return "Phase";
-            
-            // Max/Min properties
-            case "PMAX":
-            case "P_MAX":
-                return "pmax";
-            case "PMIN":
-            case "P_MIN":
-                return "pmin";
-            case "TMAX":
-            case "T_MAX":
-                return "Tmax";
-            case "TMIN":
-            case "T_MIN":
-                return "Tmin";
-            
-            // Prandtl number
-            case "PRANDTL":
-                return "Prandtl";
-            
-            // Triple point
-            case "PTRIPLE":
-            case "P_TRIPLE":
-            case "PTRIP":
-                return "ptriple";
-            case "TTRIPLE":
-            case "T_TRIPLE":
-            case "TTRIP":
-                return "Ttriple";
-            
-            // Reducing properties
-            case "P_REDUCING":
-            case "PREDUCING":
-                return "p_reducing";
-            case "T_REDUCING":
-            case "TREDUCING":
-                return "T_reducing";
-            case "RHOMASS_REDUCING":
-            case "RHOMASSREDUCING":
-                return "rhomass_reducing";
-            case "RHOMOLAR_REDUCING":
-            case "RHOMOLARREDUCING":
-                return "rhomolar_reducing";
-            
-            // Freeze temperature
-            case "T_FREEZE":
-            case "TFREEZE":
-            case "FREEZING_TEMPERATURE":
-                return "T_freeze";
-            
-            // Viscosity
-            case "MU":
-            case "VISCOSITY":
-            case "V":
-                return "viscosity";
-            
-            // Compressibility factor
-            case "Z":
-            case "COMPRESSIBILITY":
-            case "COMPRESSIBILITYFACTOR":
-                return "Z";
-            
-            // Acentric factor
-            case "ACENTRIC":
-            case "ACENTRIC_FACTOR":
-            case "ACENTRICFACTOR":
-            case "OMEGA":
-                return "acentric";
-            
-            // Fundamental derivative of gas dynamics
-            case "FUNDAMENTAL_DERIVATIVE_OF_GAS_DYNAMICS":
-            case "FUNDAMENTALDERIVATIVE":
-            case "FH":
-                return "fundamental_derivative_of_gas_dynamics";
-            
-            // Gas constant
-            case "GAS_CONSTANT":
-            case "GASCONSTANT":
-                return "gas_constant";
-            
-            // Fraction limits
-            case "FRACTION_MAX":
-            case "FRACTIONMAX":
-                return "fraction_max";
-            case "FRACTION_MIN":
-            case "FRACTIONMIN":
-                return "fraction_min";
-            
-            // Global warming potential
-            case "GWP20":
-            case "GWP_20":
-                return "GWP20";
-            case "GWP100":
-            case "GWP_100":
-                return "GWP100";
-            case "GWP500":
-            case "GWP_500":
-                return "GWP500";
-            
-            // Ozone depletion potential
-            case "ODP":
-            case "OZONEDEPLETIONPOTENTIAL":
-                return "ODP";
-            
-            // Helmholtz energy (aliases)
-            case "HH":
-                return "HELMHOLTZMASS";
-            
-            // Phase identification parameter
-            case "PIP":
-                return "PIP";
-            
-            default:
-                return name; // Return as is if no match is found
-        }
+        return input is object[,] || input is double[,];
     }
 
-    // Normalize fluid names to match CoolProp's expected format (case-insensitive)
+    private static bool IsRowArray(object input)
+    {
+        if (input is object[,] arr2D)
+        {
+            return arr2D.GetLength(0) == 1 && arr2D.GetLength(1) > 1;
+        }
+        else if (input is double[,] dblArr2D)
+        {
+            return dblArr2D.GetLength(0) == 1 && dblArr2D.GetLength(1) > 1;
+        }
+        return false;
+    }
+
+    private static double[] ExtractDoubleArray(object input)
+    {
+        if (input is object[,] arr2D)
+        {
+            // Determine if it's a row or column
+            int rows = arr2D.GetLength(0);
+            int cols = arr2D.GetLength(1);
+            
+            if (rows == 1) // Row array
+            {
+                var result = new double[cols];
+                for (int i = 0; i < cols; i++)
+                {
+                    if (arr2D[0, i] is double d)
+                        result[i] = d;
+                    else
+                        throw new InvalidCastException($"Element at position {i} is not a number.");
+                }
+                return result;
+            }
+            else if (cols == 1) // Column array
+            {
+                var result = new double[rows];
+                for (int i = 0; i < rows; i++)
+                {
+                    if (arr2D[i, 0] is double d)
+                        result[i] = d;
+                    else
+                        throw new InvalidCastException($"Element at position {i} is not a number.");
+                }
+                return result;
+            }
+            else
+            {
+                throw new ArgumentException("Array must be a single row or single column.");
+            }
+        }
+        else if (input is double[,] dblArr2D)
+        {
+            int rows = dblArr2D.GetLength(0);
+            int cols = dblArr2D.GetLength(1);
+            
+            if (rows == 1) // Row array
+            {
+                var result = new double[cols];
+                for (int i = 0; i < cols; i++)
+                    result[i] = dblArr2D[0, i];
+                return result;
+            }
+            else if (cols == 1) // Column array
+            {
+                var result = new double[rows];
+                for (int i = 0; i < rows; i++)
+                    result[i] = dblArr2D[i, 0];
+                return result;
+            }
+            else
+            {
+                throw new ArgumentException("Array must be a single row or single column.");
+            }
+        }
+        
+        throw new ArgumentException("Input is not a valid array type.");
+    }
+
+    // Optimized property name mapping using dictionary lookups
+    private static string FormatName(string name)
+    {
+        if (PropertyNameMap.TryGetValue(name, out string mapped))
+            return mapped;
+        return name; // Return as is if no match found
+    }
+
+    // Optimize fluid name mapping using dictionary lookups
     private static string FormatFluidName(string fluid)
     {
         // Handle mixture strings (contain "&" or "HEOS::")
-        if (fluid.Contains("&") || fluid.ToUpper().StartsWith("HEOS::"))
+        if (fluid.Contains("&") || fluid.StartsWith("HEOS::", StringComparison.OrdinalIgnoreCase))
             return fluid;
 
-        string upper = fluid.ToUpper().Replace("-", "").Replace("_", "").Replace(" ", "");
+        // Normalize by removing dashes, underscores, and spaces
+        string normalized = fluid.Replace("-", "").Replace("_", "").Replace(" ", "");
         
-        // Pure fluids (alphabetical)
-        switch (upper)
-        {
-            case "1BUTENE": return "1-Butene";
-            case "ACETONE": return "Acetone";
-            case "AIR": return "Air";
-            case "AMMONIA": case "NH3": return "Ammonia";
-            case "ARGON": case "AR": return "Argon";
-            case "BENZENE": return "Benzene";
-            case "CARBONDIOXIDE": case "CO2": return "CarbonDioxide";
-            case "CARBONMONOXIDE": case "CO": return "CarbonMonoxide";
-            case "CARBONYLSULFIDE": case "COS": return "CarbonylSulfide";
-            case "CIS2BUTENE": return "cis-2-Butene";
-            case "CYCLOHEXANE": return "CycloHexane";
-            case "CYCLOPENTANE": return "Cyclopentane";
-            case "CYCLOPROPANE": return "CycloPropane";
-            case "D4": return "D4";
-            case "D5": return "D5";
-            case "D6": return "D6";
-            case "DEUTERIUM": case "D2": return "Deuterium";
-            case "DICHLOROETHANE": return "Dichloroethane";
-            case "DIETHYLETHER": return "DiethylEther";
-            case "DIMETHYLCARBONATE": return "DimethylCarbonate";
-            case "DIMETHYLETHER": case "DME": return "DimethylEther";
-            case "ETHANE": case "C2H6": return "Ethane";
-            case "ETHANOL": return "Ethanol";
-            case "ETHYLBENZENE": return "EthylBenzene";
-            case "ETHYLENE": case "C2H4": return "Ethylene";
-            case "ETHYLENEOXIDE": return "EthyleneOxide";
-            case "FLUORINE": case "F2": return "Fluorine";
-            case "HEAVYWATER": case "D2O": return "HeavyWater";
-            case "HELIUM": case "HE": return "Helium";
-            case "HFE143M": return "HFE143m";
-            case "HYDROGEN": case "H2": return "Hydrogen";
-            case "HYDROGENCHLORIDE": case "HCL": return "HydrogenChloride";
-            case "HYDROGENSULFIDE": case "H2S": return "HydrogenSulfide";
-            case "ISOBUTANE": case "IBUTANE": return "IsoButane";
-            case "ISOBUTENE": case "IBUTENE": return "IsoButene";
-            case "ISOHEXANE": return "Isohexane";
-            case "ISOPENTANE": return "Isopentane";
-            case "KRYPTON": case "KR": return "Krypton";
-            case "MXYLENE": return "m-Xylene";
-            case "MD2M": return "MD2M";
-            case "MD3M": return "MD3M";
-            case "MD4M": return "MD4M";
-            case "MDM": return "MDM";
-            case "METHANE": case "CH4": return "Methane";
-            case "METHANOL": case "MEOH": return "Methanol";
-            case "METHYLLINOLEATE": return "MethylLinoleate";
-            case "METHYLLINOLENATE": return "MethylLinolenate";
-            case "METHYLOLEATE": return "MethylOleate";
-            case "METHYLPALMITATE": return "MethylPalmitate";
-            case "METHYLSTEARATE": return "MethylStearate";
-            case "MM": return "MM";
-            case "NBUTANE": case "BUTANE": return "n-Butane";
-            case "NDECANE": case "DECANE": return "n-Decane";
-            case "NDODECANE": case "DODECANE": return "n-Dodecane";
-            case "NHEPTANE": case "HEPTANE": return "n-Heptane";
-            case "NHEXANE": case "HEXANE": return "n-Hexane";
-            case "NNONANE": case "NONANE": return "n-Nonane";
-            case "NOCTANE": case "OCTANE": return "n-Octane";
-            case "NPENTANE": case "PENTANE": return "n-Pentane";
-            case "NPROPANE": case "PROPANE": return "n-Propane";
-            case "NUNDECANE": case "UNDECANE": return "n-Undecane";
-            case "NEON": case "NE": return "Neon";
-            case "NEOPENTANE": return "Neopentane";
-            case "NITROGEN": case "N2": return "Nitrogen";
-            case "NITROUSOXIDE": case "N2O": return "NitrousOxide";
-            case "NOVEC649": return "Novec649";
-            case "OXYLENE": return "o-Xylene";
-            case "ORTHODEUTERIUM": return "OrthoDeuterium";
-            case "ORTHOHYDROGEN": return "OrthoHydrogen";
-            case "OXYGEN": case "O2": return "Oxygen";
-            case "PXYLENE": return "p-Xylene";
-            case "PARADEUTERIUM": return "ParaDeuterium";
-            case "PARAHYDROGEN": return "ParaHydrogen";
-            case "PROPYLENE": case "C3H6": return "Propylene";
-            case "PROPYNE": return "Propyne";
-            case "R11": return "R11";
-            case "R113": return "R113";
-            case "R114": return "R114";
-            case "R115": return "R115";
-            case "R116": return "R116";
-            case "R12": return "R12";
-            case "R123": return "R123";
-            case "R1233ZDE": case "R1233ZD(E)": return "R1233zd(E)";
-            case "R1234YF": return "R1234yf";
-            case "R1234ZEE": case "R1234ZE(E)": return "R1234ze(E)";
-            case "R1234ZEZ": case "R1234ZE(Z)": return "R1234ze(Z)";
-            case "R124": return "R124";
-            case "R125": return "R125";
-            case "R13": return "R13";
-            case "R134A": return "R134a";
-            case "R13I1": return "R13I1";
-            case "R14": return "R14";
-            case "R141B": return "R141b";
-            case "R142B": return "R142b";
-            case "R143A": return "R143a";
-            case "R152A": return "R152A";
-            case "R161": return "R161";
-            case "R21": return "R21";
-            case "R218": return "R218";
-            case "R22": return "R22";
-            case "R227EA": return "R227EA";
-            case "R23": return "R23";
-            case "R236EA": return "R236EA";
-            case "R236FA": return "R236FA";
-            case "R245CA": return "R245ca";
-            case "R245FA": return "R245fa";
-            case "R32": return "R32";
-            case "R365MFC": return "R365MFC";
-            case "R40": return "R40";
-            case "R404A": return "R404A";
-            case "R407C": return "R407C";
-            case "R41": return "R41";
-            case "R410A": return "R410A";
-            case "R507A": return "R507A";
-            case "RC318": return "RC318";
-            case "SES36": return "SES36";
-            case "SULFURDIOXIDE": case "SO2": return "SulfurDioxide";
-            case "SULFURHEXAFLUORIDE": case "SF6": return "SulfurHexafluoride";
-            case "TOLUENE": return "Toluene";
-            case "TRANS2BUTENE": return "trans-2-Butene";
-            case "WATER": case "H2O": return "Water";
-            case "XENON": case "XE": return "Xenon";
-            
-            // Predefined mixtures
-            case "AIR.MIX": return "Air.mix";
-            case "AMARILLO.MIX": return "Amarillo.mix";
-            case "EKOFISK.MIX": return "Ekofisk.mix";
-            case "GULFCOAST.MIX": return "GulfCoast.mix";
-            case "GULFCOASTGAS(NIST1).MIX": case "GULFCOASTGASNIST1.MIX": return "GulfCoastGas(NIST1).mix";
-            case "HIGHCO2.MIX": return "HighCO2.mix";
-            case "HIGHN2.MIX": return "HighN2.mix";
-            case "NATURALGASSAMPLE.MIX": return "NaturalGasSample.mix";
-            case "R401A.MIX": return "R401A.mix";
-            case "R401B.MIX": return "R401B.mix";
-            case "R401C.MIX": return "R401C.mix";
-            case "R402A.MIX": return "R402A.mix";
-            case "R402B.MIX": return "R402B.mix";
-            case "R403A.MIX": return "R403A.mix";
-            case "R403B.MIX": return "R403B.mix";
-            case "R404A.MIX": return "R404A.mix";
-            case "R405A.MIX": return "R405A.mix";
-            case "R406A.MIX": return "R406A.mix";
-            case "R407A.MIX": return "R407A.mix";
-            case "R407B.MIX": return "R407B.mix";
-            case "R407C.MIX": return "R407C.mix";
-            case "R407D.MIX": return "R407D.mix";
-            case "R407E.MIX": return "R407E.mix";
-            case "R407F.MIX": return "R407F.mix";
-            case "R408A.MIX": return "R408A.mix";
-            case "R409A.MIX": return "R409A.mix";
-            case "R409B.MIX": return "R409B.mix";
-            case "R410A.MIX": return "R410A.mix";
-            case "R410B.MIX": return "R410B.mix";
-            case "R411A.MIX": return "R411A.mix";
-            case "R411B.MIX": return "R411B.mix";
-            case "R412A.MIX": return "R412A.mix";
-            case "R413A.MIX": return "R413A.mix";
-            case "R414A.MIX": return "R414A.mix";
-            case "R414B.MIX": return "R414B.mix";
-            case "R415A.MIX": return "R415A.mix";
-            case "R415B.MIX": return "R415B.mix";
-            case "R416A.MIX": return "R416A.mix";
-            case "R417A.MIX": return "R417A.mix";
-            case "R417B.MIX": return "R417B.mix";
-            case "R417C.MIX": return "R417C.mix";
-            case "R418A.MIX": return "R418A.mix";
-            case "R419A.MIX": return "R419A.mix";
-            case "R419B.MIX": return "R419B.mix";
-            case "R420A.MIX": return "R420A.mix";
-            case "R421A.MIX": return "R421A.mix";
-            case "R421B.MIX": return "R421B.mix";
-            case "R422A.MIX": return "R422A.mix";
-            case "R422B.MIX": return "R422B.mix";
-            case "R422C.MIX": return "R422C.mix";
-            case "R422D.MIX": return "R422D.mix";
-            case "R422E.MIX": return "R422E.mix";
-            case "R423A.MIX": return "R423A.mix";
-            case "R424A.MIX": return "R424A.mix";
-            case "R425A.MIX": return "R425A.mix";
-            case "R426A.MIX": return "R426A.mix";
-            case "R427A.MIX": return "R427A.mix";
-            case "R428A.MIX": return "R428A.mix";
-            case "R429A.MIX": return "R429A.mix";
-            case "R430A.MIX": return "R430A.mix";
-            case "R431A.MIX": return "R431A.mix";
-            case "R432A.MIX": return "R432A.mix";
-            case "R433A.MIX": return "R433A.mix";
-            case "R433B.MIX": return "R433B.mix";
-            case "R433C.MIX": return "R433C.mix";
-            case "R434A.MIX": return "R434A.mix";
-            case "R435A.MIX": return "R435A.mix";
-            case "R436A.MIX": return "R436A.mix";
-            case "R436B.MIX": return "R436B.mix";
-            case "R437A.MIX": return "R437A.mix";
-            case "R438A.MIX": return "R438A.mix";
-            case "R439A.MIX": return "R439A.mix";
-            case "R440A.MIX": return "R440A.mix";
-            case "R441A.MIX": return "R441A.mix";
-            case "R442A.MIX": return "R442A.mix";
-            case "R443A.MIX": return "R443A.mix";
-            case "R444A.MIX": return "R444A.mix";
-            case "R444B.MIX": return "R444B.mix";
-            case "R445A.MIX": return "R445A.mix";
-            case "R446A.MIX": return "R446A.mix";
-            case "R447A.MIX": return "R447A.mix";
-            case "R448A.MIX": return "R448A.mix";
-            case "R449A.MIX": return "R449A.mix";
-            case "R449B.MIX": return "R449B.mix";
-            case "R450A.MIX": return "R450A.mix";
-            case "R451A.MIX": return "R451A.mix";
-            case "R451B.MIX": return "R451B.mix";
-            case "R452A.MIX": return "R452A.mix";
-            case "R453A.MIX": return "R453A.mix";
-            case "R454A.MIX": return "R454A.mix";
-            case "R454B.MIX": return "R454B.mix";
-            case "R500.MIX": return "R500.mix";
-            case "R501.MIX": return "R501.mix";
-            case "R502.MIX": return "R502.mix";
-            case "R503.MIX": return "R503.mix";
-            case "R504.MIX": return "R504.mix";
-            case "R507A.MIX": return "R507A.mix";
-            case "R508A.MIX": return "R508A.mix";
-            case "R508B.MIX": return "R508B.mix";
-            case "R509A.MIX": return "R509A.mix";
-            case "R510A.MIX": return "R510A.mix";
-            case "R511A.MIX": return "R511A.mix";
-            case "R512A.MIX": return "R512A.mix";
-            case "R513A.MIX": return "R513A.mix";
-            case "TYPICALNATURALGAS.MIX": return "TypicalNaturalGas.mix";
-            
-            default:
-                return fluid; // Return as is if no match is found
-        }
+        if (FluidNameMap.TryGetValue(normalized, out string mapped))
+            return mapped;
+        
+        return fluid; // Return as is if no match found
     }
 
-    // Convert from custom units to SI units
-    private static double ConvertToSI(string name, double value)
-    {
-        switch (name)
-        {
-            case "T": // Temperature (°C to K)
-            case "Tcrit": // Critical temperature (°C to K)
-            case "Tmax": // Maximum temperature (°C to K)
-            case "Tmin": // Minimum temperature (°C to K)
-            case "Ttriple": // Triple point temperature (°C to K)
-            case "T_freeze": // Freeze temperature (°C to K)
-            case "T_reducing": // Reducing temperature (°C to K)
-                return value + 273.15;
-            case "P": // Pressure (bar to Pa)
-            case "Pcrit": // Critical pressure (bar to Pa)
-            case "pmax": // Maximum pressure (bar to Pa)
-            case "pmin": // Minimum pressure (bar to Pa)
-            case "ptriple": // Triple point pressure (bar to Pa)
-            case "p_reducing": // Reducing pressure (bar to Pa)
-                return value * 1e5;
-            case "H": // Specific Enthalpy (kJ/kg to J/kg)
-            case "Hmolar": // Molar Enthalpy (kJ/mol to J/mol)
-            case "U": // Specific Internal Energy (kJ/kg to J/kg)
-            case "Umolar": // Molar Internal Energy (kJ/mol to J/mol)
-            case "S": // Specific Entropy (kJ/kg/K to J/kg/K)
-            case "Smolar": // Molar Entropy (kJ/mol/K to J/mol/K)
-            case "Smolar_residual": // Residual molar entropy (kJ/mol/K to J/mol/K)
-            case "Cpmass": // Mass specific heat at constant pressure (kJ/kg/K to J/kg/K)
-            case "Cvmass": // Mass specific heat at constant volume (kJ/kg/K to J/kg/K)
-            case "Cpmolar": // Molar specific heat at constant pressure (kJ/mol/K to J/mol/K)
-            case "Cvmolar": // Molar specific heat at constant volume (kJ/mol/K to J/mol/K)
-            case "Cp0mass": // Ideal gas mass specific heat (kJ/kg/K to J/kg/K)
-            case "Cp0molar": // Ideal gas molar specific heat (kJ/mol/K to J/mol/K)
-            case "G": // Gibbs energy (kJ/kg to J/kg)
-            case "Gmolar": // Molar Gibbs energy (kJ/mol to J/mol)
-                return value * 1000;
-            default:
-                return value; // No conversion if unit not found
-        }
-    }
-
-    // Convert from SI units to custom units
-    private static double ConvertFromSI(string name, double value)
-    {
-        switch (name)
-        {
-            case "T": // Temperature (K to °C)
-            case "Tcrit": // Critical temperature (K to °C)
-            case "Tmax": // Maximum temperature (K to °C)
-            case "Tmin": // Minimum temperature (K to °C)
-            case "Ttriple": // Triple point temperature (K to °C)
-            case "T_freeze": // Freeze temperature (K to °C)
-            case "T_reducing": // Reducing temperature (K to °C)
-                return value - 273.15;
-            case "P": // Pressure (Pa to bar)
-            case "Pcrit": // Critical pressure (Pa to bar)
-            case "pmax": // Maximum pressure (Pa to bar)
-            case "pmin": // Minimum pressure (Pa to bar)
-            case "ptriple": // Triple point pressure (Pa to bar)
-            case "p_reducing": // Reducing pressure (Pa to bar)
-                return value / 1e5;
-            case "H": // Specific Enthalpy (J/kg to kJ/kg)
-            case "Hmolar": // Molar Enthalpy (J/mol to kJ/mol)
-            case "U": // Specific Internal Energy (J/kg to kJ/kg)
-            case "Umolar": // Molar Internal Energy (J/mol to kJ/mol)
-            case "S": // Specific Entropy (J/kg/K to kJ/kg/K)
-            case "Smolar": // Molar Entropy (J/mol/K to kJ/mol/K)
-            case "Smolar_residual": // Residual molar entropy (J/mol/K to kJ/mol/K)
-            case "Cpmass": // Mass specific heat at constant pressure (J/kg/K to kJ/kg/K)
-            case "Cvmass": // Mass specific heat at constant volume (J/kg/K to kJ/kg/K)
-            case "Cpmolar": // Molar specific heat at constant pressure (J/mol/K to kJ/mol/K)
-            case "Cvmolar": // Molar specific heat at constant volume (J/mol/K to kJ/mol/K)
-            case "Cp0mass": // Ideal gas mass specific heat (J/kg/K to kJ/kg/K)
-            case "Cp0molar": // Ideal gas molar specific heat (J/mol/K to kJ/mol/K)
-            case "G": // Gibbs energy (J/kg to kJ/kg)
-            case "Gmolar": // Molar Gibbs energy (J/mol to kJ/mol)
-                return value / 1000;
-            default:
-                return value; // No conversion if unit not found
-        }
-    }
-
-    // Normalize name capitalization for HA properties (comprehensive with case-insensitive support)
+    // Optimized humid air property name mapping
     private static string FormatName_HA(string name)
     {
-        switch (name.ToUpper())
-        {
-            // Wet Bulb Temperature
-            case "B":
-            case "TWB":
-            case "T_WB":
-            case "WETBULB":
-            case "WETBULBTEMP":
-            case "WETBULBTEMPERATURE":
-                return "Twb";
-            
-            // Specific heat per unit dry air (cp)
-            case "C":
-            case "CP":
-            case "CDA":
-            case "CPDA":
-            case "CP_DA":
-                return "Cda";
-            
-            // Specific heat of humid air
-            case "CHA":
-            case "CPHA":
-            case "CP_HA":
-                return "Cha";
-            
-            // Constant volume specific heat per unit dry air
-            case "CV":
-            case "CVMASS":
-                return "CV";
-            
-            // Constant volume specific heat per unit humid air
-            case "CVHA":
-            case "CV_HA":
-                return "CVha";
-            
-            // Dew Point Temperature
-            case "D":
-            case "TDP":
-            case "T_DP":
-            case "DEWPOINT":
-            case "DEWPOINTTEMP":
-            case "DEWPOINTTEMPERATURE":
-                return "Tdp";
-            
-            // Enthalpy of dry air
-            case "H":
-            case "HDA":
-            case "H_DA":
-            case "ENTHALPY":
-                return "Hda";
-            
-            // Enthalpy of humid air
-            case "HHA":
-            case "H_HA":
-                return "Hha";
-            
-            // Thermal conductivity
-            case "K":
-            case "CONDUCTIVITY":
-            case "THERMALCONDUCTIVITY":
-                return "K";
-            
-            // Dynamic viscosity
-            case "M":
-            case "MU":
-            case "VISC":
-            case "VISCOSITY":
-            case "DYNAMICVISCOSITY":
-                return "MU";
-            
-            // Water mole fraction
-            case "PSI_W":
-            case "PSIW":
-            case "Y":
-                return "Psi_w";
-            
-            // Pressure
-            case "P":
-            case "PRESSURE":
-            case "PRES":
-                return "P";
-            
-            // Partial pressure of water
-            case "P_W":
-            case "PW":
-            case "PARTIALPRESSURE":
-            case "WATERPRESSURE":
-                return "P_w";
-            
-            // Relative humidity
-            case "R":
-            case "RH":
-            case "RELHUM":
-            case "RELATIVEHUMIDITY":
-                return "R";
-            
-            // Entropy of dry air
-            case "S":
-            case "SDA":
-            case "S_DA":
-            case "ENTROPY":
-                return "Sda";
-            
-            // Entropy of humid air
-            case "SHA":
-            case "S_HA":
-                return "Sha";
-            
-            // Dry bulb temperature
-            case "T":
-            case "TDB":
-            case "T_DB":
-            case "TEMP":
-            case "TEMPERATURE":
-            case "DRYBULB":
-            case "DRYBULBTEMP":
-            case "DRYBULBTEMPERATURE":
-                return "T";
-            
-            // Specific volume of dry air
-            case "V":
-            case "VDA":
-            case "V_DA":
-                return "Vda";
-            
-            // Specific volume of humid air
-            case "VHA":
-            case "V_HA":
-                return "Vha";
-            
-            // Humidity ratio
-            case "W":
-            case "OMEGA":
-            case "HUMRAT":
-            case "HUMIDITYRATIO":
-            case "MIXINGRATIO":
-                return "W";
-            
-            // Compressibility factor
-            case "Z":
-            case "COMPRESSIBILITY":
-            case "COMPRESSIBILITYFACTOR":
-                return "Z";
-            
-            default:
-                return name; // Return as is if no match is found
-        }
+        if (HumidAirPropertyMap.TryGetValue(name, out string mapped))
+            return mapped;
+        return name; // Return as is if no match found
+    }
+
+    // Optimized unit conversion to SI using HashSet lookups
+    private static double ConvertToSI(string name, double value)
+    {
+        if (TemperatureProperties.Contains(name))
+            return value + 273.15;
+        if (PressureProperties.Contains(name))
+            return value * 1e5;
+        if (EnergyProperties.Contains(name))
+            return value * 1000;
+        return value; // No conversion if unit not found
+    }
+
+    // Optimized unit conversion from SI using HashSet lookups
+    private static double ConvertFromSI(string name, double value)
+    {
+        if (TemperatureProperties.Contains(name))
+            return value - 273.15;
+        if (PressureProperties.Contains(name))
+            return value / 1e5;
+        if (EnergyProperties.Contains(name))
+            return value / 1000;
+        return value; // No conversion if unit not found
     }
 
     // Convert from custom units to SI units for HA properties
     private static double ConvertToSI_HA(string name, double value)
     {
-        switch (name)
-        {
-            case "Twb": // Wet Bulb Temperature (°C to K)
-            case "Tdp": // Dew Point Temperature (°C to K)
-            case "T": // Dry Bulb Temperature (°C to K)
-                return value + 273.15;
-            case "Cda": // Specific heat of dry air (kJ/kg/K to J/kg/K)
-            case "Cha": // Specific heat of humid air (kJ/kg/K to J/kg/K)
-            case "Hda": // Specific Enthalpy of dry air (kJ/kg to J/kg)
-            case "Hha": // Specific Enthalpy of humid air (kJ/kg to J/kg)
-            case "H": // Specific Enthalpy of humid air (kJ/kg to J/kg)
-            case "Sda": // Specific entropy of dry air (kJ/kg/K to J/kg/K)
-            case "Sha": // Specific entropy of humid air (kJ/kg/K to J/kg/K)
-            case "S": // Specific entropy of humid air (kJ/kg/K to J/kg/K)
-                return value * 1000;
-            case "P": // Pressure (bar to Pa)
-            case "P_w": // Partial pressure of water (bar to Pa)
-                return value * 1e5;
-            default:
-                return value; // No conversion if unit not found
-        }
+        if (TemperatureProperties.Contains(name))
+            return value + 273.15;
+        if (PressureProperties.Contains(name))
+            return value * 1e5;
+        if (EnergyProperties.Contains(name))
+            return value * 1000;
+        return value; // No conversion if unit not found
     }
 
     // Convert from SI units to custom units for HA properties
     private static double ConvertFromSI_HA(string name, double value)
     {
-        switch (name)
-        {
-            case "Twb": // Wet Bulb Temperature (K to °C)
-            case "Tdp": // Dew Point Temperature (K to °C)
-            case "T": // Dry Bulb Temperature (K to °C)
-                return value - 273.15;
-            case "Cda": // Specific heat of dry air (J/kg/K to kJ/kg/K)
-            case "Cha": // Specific heat of humid air (J/kg/K to kJ/kg/K)
-            case "Hda": // Specific Enthalpy of dry air (J/kg to kJ/kg)
-            case "Hha": // Specific Enthalpy of humid air (J/kg to kJ/kg)
-            case "H": // Specific Enthalpy of humid air (J/kg to kJ/kg)
-            case "Sda": // Specific entropy of dry air (J/kg/K to kJ/kg/K)
-            case "Sha": // Specific entropy of humid air (J/kg/K to kJ/kg/K)
-            case "S": // Specific entropy of humid air (J/kg/K to kJ/kg/K)
-                return value / 1000;
-            case "P": // Pressure (Pa to bar)
-            case "P_w": // Partial pressure of water (Pa to bar)
-                return value / 1e5;
-            default:
-                return value; // No conversion if unit not found
-        }
+        if (TemperatureProperties.Contains(name))
+            return value - 273.15;
+        if (PressureProperties.Contains(name))
+            return value / 1e5;
+        if (EnergyProperties.Contains(name))
+            return value / 1000;
+        return value; // No conversion if unit not found
     }
 
 }
