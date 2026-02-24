@@ -431,7 +431,7 @@ dotnet build -c Release -p:Platform=x64
 
 ## License
 
-This project is provided as-is. CoolProp is licensed under the MIT License. See the CoolProp project for details.
+CoolProp is licensed under the MIT License. See the CoolProp project for details. This project is licensed under GNU GPL v3 license.
 
 ## Credits
 
