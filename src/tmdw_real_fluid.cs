@@ -31,24 +31,29 @@ public static partial class CoolPropWrapper
             double result;
             try
             {
-                result = PropsSI_Internal(output, name1, (double)value1, name2, (double)value2, fluid);
+                result = CachedPropsSI(output, name1, (double)value1, name2, (double)value2, fluid);
             }
             catch (DllNotFoundException ex)
             {
+                LogDebug($"PropsSI DllNotFoundException: {ex.Message}");
                 return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
             }
             catch (EntryPointNotFoundException ex)
             {
+                LogDebug($"PropsSI EntryPointNotFoundException: {ex.Message}");
                 return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
             }
             catch (Exception ex)
             {
+                LogDebug($"PropsSI exception ({output},{name1},{value1},{name2},{value2},{fluid}): {ex.Message}");
                 return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
             }
 
             if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
             {
-                return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
+                string err = GetCoolPropError();
+                LogDebug($"PropsSI invalid result ({output},{name1},{value1},{name2},{value2},{fluid}): {err}");
+                return $"Error: CoolProp failed to compute property. {err}";
             }
 
             return result;
@@ -96,7 +101,7 @@ public static partial class CoolPropWrapper
                 double result;
                 try
                 {
-                    result = PropsSI_Internal(output, name1, val1, name2, val2, fluid);
+                    result = CachedPropsSI(output, name1, val1, name2, val2, fluid);
                 }
                 catch (Exception ex)
                 {
@@ -112,7 +117,7 @@ public static partial class CoolPropWrapper
             }
 
             bool outputAsRow = (isValue1Array && IsRowArray(value1)) || (isValue2Array && IsRowArray(value2));
-            
+
             object[,] outputArray;
             if (outputAsRow)
             {
@@ -176,24 +181,29 @@ public static partial class CoolPropWrapper
             double result;
             try
             {
-                result = PropsSI_Internal(output, name1, val1SI, name2, val2SI, fluid);
+                result = CachedPropsSI(output, name1, val1SI, name2, val2SI, fluid);
             }
             catch (DllNotFoundException ex)
             {
+                LogDebug($"Props DllNotFoundException: {ex.Message}");
                 return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
             }
             catch (EntryPointNotFoundException ex)
             {
+                LogDebug($"Props EntryPointNotFoundException: {ex.Message}");
                 return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
             }
             catch (Exception ex)
             {
+                LogDebug($"Props exception ({output},{name1},{value1},{name2},{value2},{fluid}): {ex.Message}");
                 return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
             }
 
             if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
             {
-                return $"Error: CoolProp failed to compute property. {GetCoolPropError()}";
+                string err = GetCoolPropError();
+                LogDebug($"Props invalid result ({output},{name1},{value1},{name2},{value2},{fluid}): {err}");
+                return $"Error: CoolProp failed to compute property. {err}";
             }
 
             return ConvertFromSI(output, result);
@@ -244,7 +254,7 @@ public static partial class CoolPropWrapper
                 double result;
                 try
                 {
-                    result = PropsSI_Internal(output, name1, val1SI, name2, val2SI, fluid);
+                    result = CachedPropsSI(output, name1, val1SI, name2, val2SI, fluid);
                 }
                 catch (Exception ex)
                 {
@@ -371,7 +381,7 @@ public static partial class CoolPropWrapper
         double result;
         try
         {
-            result = Props1SI_Internal(output, fluid);
+            result = CachedProps1SI(output, fluid);
         }
         catch (DllNotFoundException ex)
         {
@@ -407,7 +417,7 @@ public static partial class CoolPropWrapper
         double result;
         try
         {
-            result = Props1SI_Internal(output, fluid);
+            result = CachedProps1SI(output, fluid);
         }
         catch (DllNotFoundException ex)
         {

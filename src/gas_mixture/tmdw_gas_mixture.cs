@@ -193,12 +193,12 @@ public static partial class CoolPropWrapper
     }
 
     /// <summary>
-    /// Core gas mixture calculation (SI units). Used by both SI and engineering-unit functions.
+    /// Core gas mixture calculation (SI units). Routes through cache; used by both SI and engineering-unit functions.
     /// </summary>
     private static double CalcGasMixSI(string output, string name1, double value1, string name2, double value2,
         int[] speciesIndices, double[] molarFractions)
     {
-        return GasMixtureCalculator.CalcProperty(output, name1, value1, name2, value2, speciesIndices, molarFractions);
+        return CachedGasMixSI(output, name1, value1, name2, value2, speciesIndices, molarFractions);
     }
 
     // ========== Excel-exposed functions ==========

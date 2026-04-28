@@ -32,7 +32,7 @@ public static partial class CoolPropWrapper
             double result;
             try
             {
-                result = HAPropsSI_Internal(output, name1, (double)value1, name2, (double)value2, name3, (double)value3);
+                result = CachedHAPropsSI(output, name1, (double)value1, name2, (double)value2, name3, (double)value3);
             }
             catch (DllNotFoundException ex)
             {
@@ -103,7 +103,7 @@ public static partial class CoolPropWrapper
                 double result;
                 try
                 {
-                    result = HAPropsSI_Internal(output, name1, val1, name2, val2, name3, val3);
+                    result = CachedHAPropsSI(output, name1, val1, name2, val2, name3, val3);
                 }
                 catch (Exception ex)
                 {
