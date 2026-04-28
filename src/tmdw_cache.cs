@@ -121,8 +121,8 @@ public static partial class CoolPropWrapper
         return count;
     }
 
-    [ExcelFunction(Name = "CP_CacheStats",
-        Description = "Returns cache statistics as a string: entry count, hits, misses, and enabled status.")]
+    [ExcelFunction(Name = "CP_CacheStats", IsVolatile = true,
+        Description = "Returns cache statistics as a string: entry count, hits, misses, and enabled status. Recalculates automatically on every F9 / auto-calc cycle.")]
     public static object CP_CacheStats()
     {
         return $"Entries: {_propCache.Count} | Hits: {_cacheHits} | Misses: {_cacheMisses} | Enabled: {_cacheEnabled}";

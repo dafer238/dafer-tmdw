@@ -49,8 +49,8 @@ public static partial class CoolPropWrapper
         }
     }
 
-    [ExcelFunction(Name = "CP_GetLogPath",
-        Description = "Returns the path to the current debug log file. Call CP_EnableDebug(TRUE) first to activate logging.")]
+    [ExcelFunction(Name = "CP_GetLogPath", IsVolatile = true,
+        Description = "Returns the path to the current debug log file, or a notice if logging is not enabled. Recalculates automatically on every F9 / auto-calc cycle.")]
     public static object CP_GetLogPath()
     {
         if (!_debugEnabled || string.IsNullOrEmpty(_logFilePath))
