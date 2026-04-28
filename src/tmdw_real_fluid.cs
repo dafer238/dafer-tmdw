@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ExcelDna.Integration;
 
 public static partial class CoolPropWrapper
 {
-    // Function to calculate thermodynamic properties using SI units (no conversion)
     [ExcelFunction(Name = "PropsSI", Description = "Calculate thermodynamic properties of real fluids using CoolProp with SI units (K, Pa, J/kg, etc.). Supports array inputs for value1 and/or value2.")]
     public static object PropsSI(string output, string name1, object value1, string name2, object value2, string fluid)
     {
@@ -59,99 +59,50 @@ public static partial class CoolPropWrapper
             return result;
         }
 
-        // Handle array inputs
         try
         {
-            double[] values1;
-            double[] values2;
-
-            if (isValue1Array)
-            {
-                values1 = ExtractDoubleArray(value1);
-            }
-            else
-            {
-                if (!(value1 is double)) return "Error: First property value is not a number.";
-                values1 = new double[] { (double)value1 };
-            }
-
-            if (isValue2Array)
-            {
-                values2 = ExtractDoubleArray(value2);
-            }
-            else
-            {
-                if (!(value2 is double)) return "Error: Second property value is not a number.";
-                values2 = new double[] { (double)value2 };
-            }
+            double[] values1 = ResolveArrayOrScalar(value1, isValue1Array, "First");
+            if (values1 == null) return "Error: First property value is not a number.";
+            double[] values2 = ResolveArrayOrScalar(value2, isValue2Array, "Second");
+            if (values2 == null) return "Error: Second property value is not a number.";
 
             if (isValue1Array && isValue2Array && values1.Length != values2.Length)
-            {
                 return $"Error: Array lengths must match. value1 has {values1.Length} elements, value2 has {values2.Length} elements.";
-            }
 
-            int resultLength = Math.Max(values1.Length, values2.Length);
-            double[] results = new double[resultLength];
+            int n = Math.Max(values1.Length, values2.Length);
+            var results = new double[n];
+            var errors = new string[n];
 
-            for (int i = 0; i < resultLength; i++)
+            Action<int> compute = i =>
             {
-                double val1 = values1[isValue1Array ? i : 0];
-                double val2 = values2[isValue2Array ? i : 0];
-
-                double result;
+                double v1 = values1[isValue1Array ? i : 0];
+                double v2 = values2[isValue2Array ? i : 0];
                 try
                 {
-                    result = CachedPropsSI(output, name1, val1, name2, val2, fluid);
+                    double r = CachedPropsSI(output, name1, v1, name2, v2, fluid);
+                    if (double.IsNaN(r) || r >= 1.0E+308 || r <= -1.0E+308)
+                        errors[i] = $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
+                    else
+                        results[i] = r;
                 }
-                catch (Exception ex)
-                {
-                    return $"Error at index {i}: {ex.Message}. CoolProp error: {GetCoolPropError()}";
-                }
+                catch (Exception ex) { errors[i] = $"Error at index {i}: {ex.Message}"; }
+            };
 
-                if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
-                {
-                    return $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
-                }
-
-                results[i] = result;
-            }
-
-            bool outputAsRow = (isValue1Array && IsRowArray(value1)) || (isValue2Array && IsRowArray(value2));
-
-            object[,] outputArray;
-            if (outputAsRow)
-            {
-                outputArray = new object[1, resultLength];
-                for (int i = 0; i < resultLength; i++)
-                {
-                    outputArray[0, i] = results[i];
-                }
-            }
+            if (n >= ParallelThreshold)
+                Parallel.For(0, n, compute);
             else
-            {
-                outputArray = new object[resultLength, 1];
-                for (int i = 0; i < resultLength; i++)
-                {
-                    outputArray[i, 0] = results[i];
-                }
-            }
-            return outputArray;
+                for (int i = 0; i < n; i++) compute(i);
+
+            for (int i = 0; i < n; i++)
+                if (errors[i] != null) { LogDebug($"PropsSI array: {errors[i]}"); return errors[i]; }
+
+            return BuildOutputArray(results, n, isValue1Array, value1, isValue2Array, value2);
         }
-        catch (InvalidCastException ex)
-        {
-            return $"Error: {ex.Message}";
-        }
-        catch (ArgumentException ex)
-        {
-            return $"Error: {ex.Message}";
-        }
-        catch (Exception ex)
-        {
-            return $"Error processing array inputs: {ex.Message}";
-        }
+        catch (InvalidCastException ex) { return $"Error: {ex.Message}"; }
+        catch (ArgumentException ex) { return $"Error: {ex.Message}"; }
+        catch (Exception ex) { return $"Error processing array inputs: {ex.Message}"; }
     }
 
-    // Function to calculate thermodynamic properties using engineering units
     [ExcelFunction(Name = "Props", Description = "Calculate thermodynamic properties of real fluids using CoolProp with engineering units (°C, bar, kJ/kg, etc.). Supports array inputs for value1 and/or value2.")]
     public static object Props(string output, string name1, object value1, string name2, object value2, string fluid)
     {
@@ -209,109 +160,56 @@ public static partial class CoolPropWrapper
             return ConvertFromSI(output, result);
         }
 
-        // Handle array inputs
         try
         {
-            double[] values1;
-            double[] values2;
-
-            if (isValue1Array)
-            {
-                values1 = ExtractDoubleArray(value1);
-            }
-            else
-            {
-                if (!(value1 is double)) return "Error: First property value is not a number.";
-                values1 = new double[] { (double)value1 };
-            }
-
-            if (isValue2Array)
-            {
-                values2 = ExtractDoubleArray(value2);
-            }
-            else
-            {
-                if (!(value2 is double)) return "Error: Second property value is not a number.";
-                values2 = new double[] { (double)value2 };
-            }
+            double[] values1 = ResolveArrayOrScalar(value1, isValue1Array, "First");
+            if (values1 == null) return "Error: First property value is not a number.";
+            double[] values2 = ResolveArrayOrScalar(value2, isValue2Array, "Second");
+            if (values2 == null) return "Error: Second property value is not a number.";
 
             if (isValue1Array && isValue2Array && values1.Length != values2.Length)
-            {
                 return $"Error: Array lengths must match. value1 has {values1.Length} elements, value2 has {values2.Length} elements.";
-            }
 
-            int resultLength = Math.Max(values1.Length, values2.Length);
-            double[] results = new double[resultLength];
+            int n = Math.Max(values1.Length, values2.Length);
+            var results = new double[n];
+            var errors = new string[n];
 
-            for (int i = 0; i < resultLength; i++)
+            Action<int> compute = i =>
             {
-                double val1 = values1[isValue1Array ? i : 0];
-                double val2 = values2[isValue2Array ? i : 0];
-
-                double val1SI = ConvertToSI(name1, val1);
-                double val2SI = ConvertToSI(name2, val2);
-
-                double result;
+                double v1SI = ConvertToSI(name1, values1[isValue1Array ? i : 0]);
+                double v2SI = ConvertToSI(name2, values2[isValue2Array ? i : 0]);
                 try
                 {
-                    result = CachedPropsSI(output, name1, val1SI, name2, val2SI, fluid);
+                    double r = CachedPropsSI(output, name1, v1SI, name2, v2SI, fluid);
+                    if (double.IsNaN(r) || r >= 1.0E+308 || r <= -1.0E+308)
+                        errors[i] = $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
+                    else
+                        results[i] = ConvertFromSI(output, r);
                 }
-                catch (Exception ex)
-                {
-                    return $"Error at index {i}: {ex.Message}. CoolProp error: {GetCoolPropError()}";
-                }
+                catch (Exception ex) { errors[i] = $"Error at index {i}: {ex.Message}"; }
+            };
 
-                if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
-                {
-                    return $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
-                }
-
-                results[i] = ConvertFromSI(output, result);
-            }
-
-            bool outputAsRow = (isValue1Array && IsRowArray(value1)) || (isValue2Array && IsRowArray(value2));
-            
-            object[,] outputArray;
-            if (outputAsRow)
-            {
-                outputArray = new object[1, resultLength];
-                for (int i = 0; i < resultLength; i++)
-                {
-                    outputArray[0, i] = results[i];
-                }
-            }
+            if (n >= ParallelThreshold)
+                Parallel.For(0, n, compute);
             else
-            {
-                outputArray = new object[resultLength, 1];
-                for (int i = 0; i < resultLength; i++)
-                {
-                    outputArray[i, 0] = results[i];
-                }
-            }
-            return outputArray;
+                for (int i = 0; i < n; i++) compute(i);
+
+            for (int i = 0; i < n; i++)
+                if (errors[i] != null) { LogDebug($"Props array: {errors[i]}"); return errors[i]; }
+
+            return BuildOutputArray(results, n, isValue1Array, value1, isValue2Array, value2);
         }
-        catch (InvalidCastException ex)
-        {
-            return $"Error: {ex.Message}";
-        }
-        catch (ArgumentException ex)
-        {
-            return $"Error: {ex.Message}";
-        }
-        catch (Exception ex)
-        {
-            return $"Error processing array inputs: {ex.Message}";
-        }
+        catch (InvalidCastException ex) { return $"Error: {ex.Message}"; }
+        catch (ArgumentException ex) { return $"Error: {ex.Message}"; }
+        catch (Exception ex) { return $"Error processing array inputs: {ex.Message}"; }
     }
 
-    // TMPr alias for Props (uses engineering units)
     [ExcelFunction(Name = "TMPr", Description = "Calculate thermodynamic properties of real fluids using CoolProp with engineering units (°C, bar, kJ/kg, etc.). Alias for Props.")]
     public static object TMPr(string output, string name1, object value1, string name2, object value2, string fluid)
     {
         return Props(output, name1, value1, name2, value2, fluid);
     }
 
-    // Function to get phase using SI units
     [ExcelFunction(Name = "PhaseSI", Description = "Get the phase of a fluid using CoolProp with SI units (K, Pa).")]
     public static object PhaseSI(string name1, object value1, string name2, object value2, string fluid)
     {
@@ -338,7 +236,6 @@ public static partial class CoolPropWrapper
         }
     }
 
-    // Function to get phase using engineering units
     [ExcelFunction(Name = "Phase", Description = "Get the phase of a fluid using CoolProp with engineering units (°C, bar).")]
     public static object Phase(string name1, object value1, string name2, object value2, string fluid)
     {
@@ -368,7 +265,6 @@ public static partial class CoolPropWrapper
         }
     }
 
-    // Function to calculate single-input properties using SI units
     [ExcelFunction(Name = "Props1SI", Description = "Calculate single-input properties (critical properties, molar mass, etc.) using CoolProp with SI units (K, Pa, kg/mol, etc.).")]
     public static object Props1SI(string output, string fluid)
     {
@@ -404,7 +300,6 @@ public static partial class CoolPropWrapper
         return result;
     }
 
-    // Function to calculate single-input properties using engineering units
     [ExcelFunction(Name = "Props1", Description = "Calculate single-input properties (critical properties, molar mass, etc.) using CoolProp with engineering units (°C, bar, kg/mol, etc.).")]
     public static object Props1(string output, string fluid)
     {
@@ -440,7 +335,6 @@ public static partial class CoolPropWrapper
         return ConvertFromSI(output, result);
     }
 
-    // Function to get CoolProp version and global parameters
     [ExcelFunction(Name = "GetGlobalParam", Description = "Get CoolProp version, revision, or other global parameter strings.")]
     public static object GetGlobalParam(string param)
     {
@@ -451,7 +345,7 @@ public static partial class CoolPropWrapper
             string result = get_global_param_string_buffer(param);
             if (string.IsNullOrEmpty(result))
                 return $"Error: Failed to retrieve global parameter '{param}'. Parameter may not exist or be invalid.";
-            
+
             return result.Trim();
         }
         catch (Exception ex)
@@ -460,7 +354,6 @@ public static partial class CoolPropWrapper
         }
     }
 
-    // Function to get fluid-specific parameter strings
     [ExcelFunction(Name = "GetFluidParam", Description = "Get fluid-specific parameter strings (aliases, CAS number, REFPROP name, etc.).")]
     public static object GetFluidParam(string fluid, string param)
     {
@@ -474,7 +367,7 @@ public static partial class CoolPropWrapper
             string result = get_fluid_param_string(fluid, param);
             if (string.IsNullOrEmpty(result))
                 return $"Error: Failed to retrieve fluid parameter '{param}' for fluid '{fluid}'. {GetCoolPropError()}";
-            
+
             return result;
         }
         catch (Exception ex)
@@ -483,7 +376,6 @@ public static partial class CoolPropWrapper
         }
     }
 
-    // Function to create mixture string from element and composition ranges
     [ExcelFunction(Name = "MixtureString", Description = "Create a mixture string for CoolProp from element names and their mole/mass fractions.")]
     public static object MixtureString(object[,] elements, object[,] fractions)
     {
@@ -530,5 +422,31 @@ public static partial class CoolPropWrapper
         {
             return $"Error creating mixture string: {ex.Message}";
         }
+    }
+
+    // ---- Private array helpers ----
+
+    /// <summary>
+    /// Returns a double[] from an array input or wraps a scalar. Returns null if scalar is not a double.
+    /// </summary>
+    private static double[] ResolveArrayOrScalar(object value, bool isArray, string paramName)
+    {
+        if (isArray) return ExtractDoubleArray(value);
+        if (value is double d) return new double[] { d };
+        return null;
+    }
+
+    /// <summary>Packs a double[] into the 2D object array Excel-DNA uses for spill, preserving row/column orientation.</summary>
+    private static object[,] BuildOutputArray(double[] results, int n,
+        bool isValue1Array, object value1, bool isValue2Array, object value2)
+    {
+        bool asRow = (isValue1Array && IsRowArray(value1)) || (isValue2Array && IsRowArray(value2));
+        var arr = asRow ? new object[1, n] : new object[n, 1];
+        for (int i = 0; i < n; i++)
+        {
+            if (asRow) arr[0, i] = results[i];
+            else arr[i, 0] = results[i];
+        }
+        return arr;
     }
 }

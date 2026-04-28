@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ExcelDna.Integration;
 
 public static partial class CoolPropWrapper
@@ -269,34 +270,30 @@ public static partial class CoolPropWrapper
             if (isValue1Array && isValue2Array && values1.Length != values2.Length)
                 return $"Error: Array lengths must match. value1 has {values1.Length} elements, value2 has {values2.Length} elements.";
 
-            int resultLength = Math.Max(values1.Length, values2.Length);
-            double[] results = new double[resultLength];
+            int n = Math.Max(values1.Length, values2.Length);
+            var results = new double[n];
+            var errors = new string[n];
 
-            for (int i = 0; i < resultLength; i++)
+            Action<int> compute = i =>
             {
                 double v1 = values1[isValue1Array ? i : 0];
                 double v2 = values2[isValue2Array ? i : 0];
-                double result = CalcGasMixSI(output, name1, v1, name2, v2, speciesIndices, molarFractions);
-                if (double.IsNaN(result))
-                    return $"Error at index {i}: Failed to compute gas mixture property.";
-                results[i] = result;
-            }
+                double r = CalcGasMixSI(output, name1, v1, name2, v2, speciesIndices, molarFractions);
+                if (double.IsNaN(r))
+                    errors[i] = $"Error at index {i}: Failed to compute gas mixture property.";
+                else
+                    results[i] = r;
+            };
 
-            bool outputAsRow = (isValue1Array && IsRowArray(value1)) || (isValue2Array && IsRowArray(value2));
-            object[,] outputArray;
-            if (outputAsRow)
-            {
-                outputArray = new object[1, resultLength];
-                for (int i = 0; i < resultLength; i++)
-                    outputArray[0, i] = results[i];
-            }
+            if (n >= ParallelThreshold)
+                Parallel.For(0, n, compute);
             else
-            {
-                outputArray = new object[resultLength, 1];
-                for (int i = 0; i < resultLength; i++)
-                    outputArray[i, 0] = results[i];
-            }
-            return outputArray;
+                for (int i = 0; i < n; i++) compute(i);
+
+            for (int i = 0; i < n; i++)
+                if (errors[i] != null) return errors[i];
+
+            return BuildOutputArray(results, n, isValue1Array, value1, isValue2Array, value2);
         }
         catch (Exception ex)
         {
@@ -369,38 +366,30 @@ public static partial class CoolPropWrapper
             if (isValue1Array && isValue2Array && values1.Length != values2.Length)
                 return $"Error: Array lengths must match. value1 has {values1.Length} elements, value2 has {values2.Length} elements.";
 
-            int resultLength = Math.Max(values1.Length, values2.Length);
-            double[] results = new double[resultLength];
+            int n = Math.Max(values1.Length, values2.Length);
+            var results = new double[n];
+            var errors = new string[n];
 
-            for (int i = 0; i < resultLength; i++)
+            Action<int> compute = i =>
             {
-                double v1 = values1[isValue1Array ? i : 0];
-                double v2 = values2[isValue2Array ? i : 0];
+                double v1SI = ConvertToSI_GasMix(name1, values1[isValue1Array ? i : 0]);
+                double v2SI = ConvertToSI_GasMix(name2, values2[isValue2Array ? i : 0]);
+                double r = CalcGasMixSI(output, name1, v1SI, name2, v2SI, speciesIndices, molarFractions);
+                if (double.IsNaN(r))
+                    errors[i] = $"Error at index {i}: Failed to compute gas mixture property.";
+                else
+                    results[i] = ConvertFromSI_GasMix(output, r);
+            };
 
-                double v1SI = ConvertToSI_GasMix(name1, v1);
-                double v2SI = ConvertToSI_GasMix(name2, v2);
-
-                double result = CalcGasMixSI(output, name1, v1SI, name2, v2SI, speciesIndices, molarFractions);
-                if (double.IsNaN(result))
-                    return $"Error at index {i}: Failed to compute gas mixture property.";
-                results[i] = ConvertFromSI_GasMix(output, result);
-            }
-
-            bool outputAsRow = (isValue1Array && IsRowArray(value1)) || (isValue2Array && IsRowArray(value2));
-            object[,] outputArray;
-            if (outputAsRow)
-            {
-                outputArray = new object[1, resultLength];
-                for (int i = 0; i < resultLength; i++)
-                    outputArray[0, i] = results[i];
-            }
+            if (n >= ParallelThreshold)
+                Parallel.For(0, n, compute);
             else
-            {
-                outputArray = new object[resultLength, 1];
-                for (int i = 0; i < resultLength; i++)
-                    outputArray[i, 0] = results[i];
-            }
-            return outputArray;
+                for (int i = 0; i < n; i++) compute(i);
+
+            for (int i = 0; i < n; i++)
+                if (errors[i] != null) return errors[i];
+
+            return BuildOutputArray(results, n, isValue1Array, value1, isValue2Array, value2);
         }
         catch (Exception ex)
         {
