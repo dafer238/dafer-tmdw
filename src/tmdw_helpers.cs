@@ -1,4 +1,5 @@
 using System;
+using ExcelDna.Integration;
 
 public static partial class CoolPropWrapper
 {
@@ -6,6 +7,24 @@ public static partial class CoolPropWrapper
     private static bool IsArrayInput(object input)
     {
         return input is object[,] || input is double[,];
+    }
+
+    /// <summary>
+    /// Returns a descriptive error string when a numeric argument receives a non-numeric value.
+    /// Distinguishes Excel error values (#N/A, #REF!, etc.) from other unexpected types.
+    /// </summary>
+    private static string DescribeNonNumericError(string paramName, object value)
+    {
+        if (value is ExcelError err)
+            return $"Error: {paramName} contains an Excel error value ({err}). " +
+                   "Ensure the referenced cell contains a valid number, not an error formula.";
+        if (value is string s)
+            return $"Error: {paramName} is a text value (\"{s}\"). A numeric value is required.";
+        if (value is bool b)
+            return $"Error: {paramName} is a boolean ({b}). A numeric value is required.";
+        if (value == null || value is ExcelMissing || value is ExcelEmpty)
+            return $"Error: {paramName} is empty or missing. A numeric value is required.";
+        return $"Error: {paramName} is not a number (received {value.GetType().Name}: {value}). A numeric value is required.";
     }
 
     private static bool IsRowArray(object input)

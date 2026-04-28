@@ -26,9 +26,9 @@ public static partial class CoolPropWrapper
 
         if (!isValue1Array && !isValue2Array && !isValue3Array)
         {
-            if (!(value1 is double)) return "Error: First property value is not a number.";
-            if (!(value2 is double)) return "Error: Second property value is not a number.";
-            if (!(value3 is double)) return "Error: Third property value is not a number.";
+            if (!(value1 is double)) return DescribeNonNumericError("value1", value1);
+            if (!(value2 is double)) return DescribeNonNumericError("value2", value2);
+            if (!(value3 is double)) return DescribeNonNumericError("value3", value3);
 
             double result;
             try
@@ -136,9 +136,9 @@ public static partial class CoolPropWrapper
 
         if (!isValue1Array && !isValue2Array && !isValue3Array)
         {
-            if (!(value1 is double)) return "Error: First property value is not a number.";
-            if (!(value2 is double)) return "Error: Second property value is not a number.";
-            if (!(value3 is double)) return "Error: Third property value is not a number.";
+            if (!(value1 is double)) return DescribeNonNumericError("value1", value1);
+            if (!(value2 is double)) return DescribeNonNumericError("value2", value2);
+            if (!(value3 is double)) return DescribeNonNumericError("value3", value3);
 
             double val1SI = ConvertToSI_HA(name1, (double)value1);
             double val2SI = ConvertToSI_HA(name2, (double)value2);

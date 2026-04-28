@@ -25,8 +25,8 @@ public static partial class CoolPropWrapper
 
         if (!isValue1Array && !isValue2Array)
         {
-            if (!(value1 is double)) return "Error: First property value is not a number.";
-            if (!(value2 is double)) return "Error: Second property value is not a number.";
+            if (!(value1 is double)) return DescribeNonNumericError("value1", value1);
+            if (!(value2 is double)) return DescribeNonNumericError("value2", value2);
 
             double result;
             try
@@ -36,12 +36,12 @@ public static partial class CoolPropWrapper
             catch (DllNotFoundException ex)
             {
                 LogDebug($"PropsSI DllNotFoundException: {ex.Message}");
-                return $"Error: CoolProp.dll not found in any search path. Use CPropDiag() function to see paths checked. {ex.Message}";
+                return $"Error: CoolProp.dll not found. Use CPropDiag() to see paths checked. {ex.Message}";
             }
             catch (EntryPointNotFoundException ex)
             {
                 LogDebug($"PropsSI EntryPointNotFoundException: {ex.Message}");
-                return $"Error: Required functions not found in CoolProp.dll. Check DLL version and architecture match. {ex.Message}";
+                return $"Error: Required CoolProp functions not found in DLL — check that CoolProp.dll is the 64-bit version. {ex.Message}";
             }
             catch (Exception ex)
             {
@@ -123,8 +123,8 @@ public static partial class CoolPropWrapper
 
         if (!isValue1Array && !isValue2Array)
         {
-            if (!(value1 is double)) return "Error: First property value is not a number.";
-            if (!(value2 is double)) return "Error: Second property value is not a number.";
+            if (!(value1 is double)) return DescribeNonNumericError("value1", value1);
+            if (!(value2 is double)) return DescribeNonNumericError("value2", value2);
 
             double val1SI = ConvertToSI(name1, (double)value1);
             double val2SI = ConvertToSI(name2, (double)value2);
@@ -214,9 +214,9 @@ public static partial class CoolPropWrapper
     public static object PhaseSI(string name1, object value1, string name2, object value2, string fluid)
     {
         if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
-        if (value1 == null || !(value1 is double)) return "Error: First property value is missing or not a number.";
+        if (value1 == null || !(value1 is double)) return DescribeNonNumericError("value1", value1);
         if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
-        if (value2 == null || !(value2 is double)) return "Error: Second property value is missing or not a number.";
+        if (value2 == null || !(value2 is double)) return DescribeNonNumericError("value2", value2);
         if (string.IsNullOrWhiteSpace(fluid)) return "Error: Fluid name is missing.";
 
         name1 = FormatName(name1);
@@ -240,9 +240,9 @@ public static partial class CoolPropWrapper
     public static object Phase(string name1, object value1, string name2, object value2, string fluid)
     {
         if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
-        if (value1 == null || !(value1 is double)) return "Error: First property value is missing or not a number.";
+        if (value1 == null || !(value1 is double)) return DescribeNonNumericError("value1", value1);
         if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
-        if (value2 == null || !(value2 is double)) return "Error: Second property value is missing or not a number.";
+        if (value2 == null || !(value2 is double)) return DescribeNonNumericError("value2", value2);
         if (string.IsNullOrWhiteSpace(fluid)) return "Error: Fluid name is missing.";
 
         name1 = FormatName(name1);
