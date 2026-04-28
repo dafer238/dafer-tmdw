@@ -4,37 +4,42 @@ using ExcelDna.Integration;
 
 public static partial class CoolPropWrapper
 {
-    [ExcelFunction(Name = "HAPropsSI", Description = "Calculate thermodynamic properties of humid air using CoolProp with SI units (K, Pa, J/kg, etc.). Supports array inputs.")]
-    public static object HAPropsSI(string output, string name1, object value1, string name2, object value2, string name3, object value3)
+    [ExcelFunction(Name = "HAPropsSI", Description = "Calculate thermodynamic properties of humid air using CoolProp with SI units (K, Pa, J/kg). All seven parameters (output, name1, name2, name3, value1, value2, value3) accept a scalar, a column array (M×1), a row array (1×N), or a 2-D range. Mixing a column and a row produces a Cartesian-product table; equal-size arrays iterate element-wise.")]
+    public static object HAPropsSI(object output, object name1, object value1, object name2, object value2, object name3, object value3)
     {
-        if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
-        if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
-        if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
-        if (string.IsNullOrWhiteSpace(name3)) return "Error: Third property name is missing.";
-        if (value1 == null) return "Error: First property value is missing.";
-        if (value2 == null) return "Error: Second property value is missing.";
-        if (value3 == null) return "Error: Third property value is missing.";
+        int[] outSh = GetParamShape(output);
+        int[] n1Sh  = GetParamShape(name1);
+        int[] v1Sh  = GetParamShape(value1);
+        int[] n2Sh  = GetParamShape(name2);
+        int[] v2Sh  = GetParamShape(value2);
+        int[] n3Sh  = GetParamShape(name3);
+        int[] v3Sh  = GetParamShape(value3);
 
-        name1 = FormatName_HA(name1);
-        name2 = FormatName_HA(name2);
-        name3 = FormatName_HA(name3);
-        output = FormatName_HA(output);
+        if (!ResolveOutputShape(out int M, out int N, outSh, n1Sh, v1Sh, n2Sh, v2Sh, n3Sh, v3Sh))
+            return "Error: Incompatible array dimensions. Row arrays (1×N) must share the same N; column arrays (M×1) must share the same M.";
 
-        bool isValue1Array = IsArrayInput(value1);
-        bool isValue2Array = IsArrayInput(value2);
-        bool isValue3Array = IsArrayInput(value3);
-
-        if (!isValue1Array && !isValue2Array && !isValue3Array)
+        if (M == 1 && N == 1)
         {
-            if (!(value1 is double)) return DescribeNonNumericError("value1", value1);
-            if (!(value2 is double)) return DescribeNonNumericError("value2", value2);
-            if (!(value3 is double)) return DescribeNonNumericError("value3", value3);
+            if (!TryGetStringAt(output, outSh, 0, 0, out string outStr) || string.IsNullOrWhiteSpace(outStr))
+                return "Error: Output parameter is missing or not a string.";
+            if (!TryGetStringAt(name1, n1Sh, 0, 0, out string n1Str) || string.IsNullOrWhiteSpace(n1Str))
+                return "Error: First property name is missing or not a string.";
+            if (!TryGetStringAt(name2, n2Sh, 0, 0, out string n2Str) || string.IsNullOrWhiteSpace(n2Str))
+                return "Error: Second property name is missing or not a string.";
+            if (!TryGetStringAt(name3, n3Sh, 0, 0, out string n3Str) || string.IsNullOrWhiteSpace(n3Str))
+                return "Error: Third property name is missing or not a string.";
+
+            outStr = FormatName_HA(outStr);
+            n1Str  = FormatName_HA(n1Str);
+            n2Str  = FormatName_HA(n2Str);
+            n3Str  = FormatName_HA(n3Str);
+
+            if (!TryGetDoubleAt(value1, v1Sh, 0, 0, out double v1)) return DescribeNonNumericError("value1", GetRawAt(value1, v1Sh, 0, 0));
+            if (!TryGetDoubleAt(value2, v2Sh, 0, 0, out double v2)) return DescribeNonNumericError("value2", GetRawAt(value2, v2Sh, 0, 0));
+            if (!TryGetDoubleAt(value3, v3Sh, 0, 0, out double v3)) return DescribeNonNumericError("value3", GetRawAt(value3, v3Sh, 0, 0));
 
             double result;
-            try
-            {
-                result = CachedHAPropsSI(output, name1, (double)value1, name2, (double)value2, name3, (double)value3);
-            }
+            try { result = CachedHAPropsSI(outStr, n1Str, v1, n2Str, v2, n3Str, v3); }
             catch (DllNotFoundException ex)
             {
                 LogDebug($"HAPropsSI DllNotFoundException: {ex.Message}");
@@ -47,108 +52,99 @@ public static partial class CoolPropWrapper
             }
             catch (Exception ex)
             {
-                LogDebug($"HAPropsSI exception ({output}): {ex.Message}");
+                LogDebug($"HAPropsSI exception ({outStr}): {ex.Message}");
                 return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
             }
 
             if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
             {
                 string err = GetCoolPropError();
-                LogDebug($"HAPropsSI invalid result ({output}): {err}");
+                LogDebug($"HAPropsSI invalid result ({outStr}): {err}");
                 return $"Error: CoolProp failed to compute property. {err}";
             }
-
             return result;
         }
 
-        try
+        var results = new object[M, N];
+        int total   = M * N;
+
+        Action<int> compute = idx =>
         {
-            double[] values1 = ResolveArrayOrScalar(value1, isValue1Array, "First");
-            if (values1 == null) return "Error: First property value is not a number.";
-            double[] values2 = ResolveArrayOrScalar(value2, isValue2Array, "Second");
-            if (values2 == null) return "Error: Second property value is not a number.";
-            double[] values3 = ResolveArrayOrScalar(value3, isValue3Array, "Third");
-            if (values3 == null) return "Error: Third property value is not a number.";
+            int r = idx / N, c = idx % N;
+            if (!TryGetStringAt(output, outSh, r, c, out string outStr) || string.IsNullOrWhiteSpace(outStr))
+                { results[r, c] = "Error: Output property name is empty at this position."; return; }
+            if (!TryGetStringAt(name1, n1Sh, r, c, out string n1Str) || string.IsNullOrWhiteSpace(n1Str))
+                { results[r, c] = "Error: First property name is empty at this position."; return; }
+            if (!TryGetStringAt(name2, n2Sh, r, c, out string n2Str) || string.IsNullOrWhiteSpace(n2Str))
+                { results[r, c] = "Error: Second property name is empty at this position."; return; }
+            if (!TryGetStringAt(name3, n3Sh, r, c, out string n3Str) || string.IsNullOrWhiteSpace(n3Str))
+                { results[r, c] = "Error: Third property name is empty at this position."; return; }
 
-            int n = Math.Max(Math.Max(values1.Length, values2.Length), values3.Length);
-            if ((isValue1Array && values1.Length != n && values1.Length > 1) ||
-                (isValue2Array && values2.Length != n && values2.Length > 1) ||
-                (isValue3Array && values3.Length != n && values3.Length > 1))
-            {
-                return $"Error: All array inputs must have the same length. Lengths: value1={values1.Length}, value2={values2.Length}, value3={values3.Length}";
-            }
+            outStr = FormatName_HA(outStr);
+            n1Str  = FormatName_HA(n1Str);
+            n2Str  = FormatName_HA(n2Str);
+            n3Str  = FormatName_HA(n3Str);
 
-            var results = new double[n];
-            var errors = new string[n];
+            if (!TryGetDoubleAt(value1, v1Sh, r, c, out double v1)) { results[r, c] = "Error: value1 is not a number at this position."; return; }
+            if (!TryGetDoubleAt(value2, v2Sh, r, c, out double v2)) { results[r, c] = "Error: value2 is not a number at this position."; return; }
+            if (!TryGetDoubleAt(value3, v3Sh, r, c, out double v3)) { results[r, c] = "Error: value3 is not a number at this position."; return; }
 
-            Action<int> compute = i =>
-            {
-                double v1 = values1[isValue1Array ? Math.Min(i, values1.Length - 1) : 0];
-                double v2 = values2[isValue2Array ? Math.Min(i, values2.Length - 1) : 0];
-                double v3 = values3[isValue3Array ? Math.Min(i, values3.Length - 1) : 0];
-                try
-                {
-                    double r = CachedHAPropsSI(output, name1, v1, name2, v2, name3, v3);
-                    if (double.IsNaN(r) || r >= 1.0E+308 || r <= -1.0E+308)
-                        errors[i] = $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
-                    else
-                        results[i] = r;
-                }
-                catch (Exception ex) { errors[i] = $"Error at index {i}: {ex.Message}"; }
-            };
-
-            if (n >= ParallelThreshold)
-                Parallel.For(0, n, compute);
-            else
-                for (int i = 0; i < n; i++) compute(i);
-
-            for (int i = 0; i < n; i++)
-                if (errors[i] != null) { LogDebug($"HAPropsSI array: {errors[i]}"); return errors[i]; }
-
-            return BuildOutputArray(results, n,
-                isValue1Array, value1,
-                isValue2Array || isValue3Array, isValue2Array ? value2 : value3);
-        }
-        catch (InvalidCastException ex) { return $"Error: {ex.Message}"; }
-        catch (ArgumentException ex) { return $"Error: {ex.Message}"; }
-        catch (Exception ex) { return $"Error processing array inputs: {ex.Message}"; }
-    }
-
-    [ExcelFunction(Name = "HAProps", Description = "Calculate thermodynamic properties of humid air using CoolProp with engineering units (°C, bar, kJ/kg, etc.). Supports array inputs.")]
-    public static object HAProps(string output, string name1, object value1, string name2, object value2, string name3, object value3)
-    {
-        if (string.IsNullOrWhiteSpace(output)) return "Error: Output parameter is missing.";
-        if (string.IsNullOrWhiteSpace(name1)) return "Error: First property name is missing.";
-        if (string.IsNullOrWhiteSpace(name2)) return "Error: Second property name is missing.";
-        if (string.IsNullOrWhiteSpace(name3)) return "Error: Third property name is missing.";
-        if (value1 == null) return "Error: First property value is missing.";
-        if (value2 == null) return "Error: Second property value is missing.";
-        if (value3 == null) return "Error: Third property value is missing.";
-
-        name1 = FormatName_HA(name1);
-        name2 = FormatName_HA(name2);
-        name3 = FormatName_HA(name3);
-        output = FormatName_HA(output);
-
-        bool isValue1Array = IsArrayInput(value1);
-        bool isValue2Array = IsArrayInput(value2);
-        bool isValue3Array = IsArrayInput(value3);
-
-        if (!isValue1Array && !isValue2Array && !isValue3Array)
-        {
-            if (!(value1 is double)) return DescribeNonNumericError("value1", value1);
-            if (!(value2 is double)) return DescribeNonNumericError("value2", value2);
-            if (!(value3 is double)) return DescribeNonNumericError("value3", value3);
-
-            double val1SI = ConvertToSI_HA(name1, (double)value1);
-            double val2SI = ConvertToSI_HA(name2, (double)value2);
-            double val3SI = ConvertToSI_HA(name3, (double)value3);
-
-            double result;
             try
             {
-                result = CachedHAPropsSI(output, name1, val1SI, name2, val2SI, name3, val3SI);
+                double rv = CachedHAPropsSI(outStr, n1Str, v1, n2Str, v2, n3Str, v3);
+                results[r, c] = (double.IsNaN(rv) || rv >= 1.0E+308 || rv <= -1.0E+308)
+                    ? (object)$"Error: CoolProp failed: {GetCoolPropError()}"
+                    : rv;
             }
+            catch (Exception ex) { results[r, c] = $"Error: {ex.Message}"; }
+        };
+
+        if (total >= ParallelThreshold) Parallel.For(0, total, compute);
+        else for (int i = 0; i < total; i++) compute(i);
+
+        return results;
+    }
+
+    [ExcelFunction(Name = "HAProps", Description = "Calculate thermodynamic properties of humid air using CoolProp with engineering units (°C, bar, kJ/kg). All seven parameters (output, name1, name2, name3, value1, value2, value3) accept a scalar, a column array (M×1), a row array (1×N), or a 2-D range. Mixing a column and a row produces a Cartesian-product table; equal-size arrays iterate element-wise.")]
+    public static object HAProps(object output, object name1, object value1, object name2, object value2, object name3, object value3)
+    {
+        int[] outSh = GetParamShape(output);
+        int[] n1Sh  = GetParamShape(name1);
+        int[] v1Sh  = GetParamShape(value1);
+        int[] n2Sh  = GetParamShape(name2);
+        int[] v2Sh  = GetParamShape(value2);
+        int[] n3Sh  = GetParamShape(name3);
+        int[] v3Sh  = GetParamShape(value3);
+
+        if (!ResolveOutputShape(out int M, out int N, outSh, n1Sh, v1Sh, n2Sh, v2Sh, n3Sh, v3Sh))
+            return "Error: Incompatible array dimensions. Row arrays (1×N) must share the same N; column arrays (M×1) must share the same M.";
+
+        if (M == 1 && N == 1)
+        {
+            if (!TryGetStringAt(output, outSh, 0, 0, out string outStr) || string.IsNullOrWhiteSpace(outStr))
+                return "Error: Output parameter is missing or not a string.";
+            if (!TryGetStringAt(name1, n1Sh, 0, 0, out string n1Str) || string.IsNullOrWhiteSpace(n1Str))
+                return "Error: First property name is missing or not a string.";
+            if (!TryGetStringAt(name2, n2Sh, 0, 0, out string n2Str) || string.IsNullOrWhiteSpace(n2Str))
+                return "Error: Second property name is missing or not a string.";
+            if (!TryGetStringAt(name3, n3Sh, 0, 0, out string n3Str) || string.IsNullOrWhiteSpace(n3Str))
+                return "Error: Third property name is missing or not a string.";
+
+            outStr = FormatName_HA(outStr);
+            n1Str  = FormatName_HA(n1Str);
+            n2Str  = FormatName_HA(n2Str);
+            n3Str  = FormatName_HA(n3Str);
+
+            if (!TryGetDoubleAt(value1, v1Sh, 0, 0, out double v1)) return DescribeNonNumericError("value1", GetRawAt(value1, v1Sh, 0, 0));
+            if (!TryGetDoubleAt(value2, v2Sh, 0, 0, out double v2)) return DescribeNonNumericError("value2", GetRawAt(value2, v2Sh, 0, 0));
+            if (!TryGetDoubleAt(value3, v3Sh, 0, 0, out double v3)) return DescribeNonNumericError("value3", GetRawAt(value3, v3Sh, 0, 0));
+
+            double val1SI = ConvertToSI_HA(n1Str, v1);
+            double val2SI = ConvertToSI_HA(n2Str, v2);
+            double val3SI = ConvertToSI_HA(n3Str, v3);
+
+            double result;
+            try { result = CachedHAPropsSI(outStr, n1Str, val1SI, n2Str, val2SI, n3Str, val3SI); }
             catch (DllNotFoundException ex)
             {
                 LogDebug($"HAProps DllNotFoundException: {ex.Message}");
@@ -161,75 +157,65 @@ public static partial class CoolPropWrapper
             }
             catch (Exception ex)
             {
-                LogDebug($"HAProps exception ({output}): {ex.Message}");
+                LogDebug($"HAProps exception ({outStr}): {ex.Message}");
                 return $"Error: Exception occurred while computing property. {ex.Message}. CoolProp error: {GetCoolPropError()}";
             }
 
             if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
             {
                 string err = GetCoolPropError();
-                LogDebug($"HAProps invalid result ({output}): {err}");
+                LogDebug($"HAProps invalid result ({outStr}): {err}");
                 return $"Error: CoolProp failed to compute property. {err}";
             }
-
-            return ConvertFromSI_HA(output, result);
+            return ConvertFromSI_HA(outStr, result);
         }
 
-        try
+        var results = new object[M, N];
+        int total   = M * N;
+
+        Action<int> compute = idx =>
         {
-            double[] values1 = ResolveArrayOrScalar(value1, isValue1Array, "First");
-            if (values1 == null) return "Error: First property value is not a number.";
-            double[] values2 = ResolveArrayOrScalar(value2, isValue2Array, "Second");
-            if (values2 == null) return "Error: Second property value is not a number.";
-            double[] values3 = ResolveArrayOrScalar(value3, isValue3Array, "Third");
-            if (values3 == null) return "Error: Third property value is not a number.";
+            int r = idx / N, c = idx % N;
+            if (!TryGetStringAt(output, outSh, r, c, out string outStr) || string.IsNullOrWhiteSpace(outStr))
+                { results[r, c] = "Error: Output property name is empty at this position."; return; }
+            if (!TryGetStringAt(name1, n1Sh, r, c, out string n1Str) || string.IsNullOrWhiteSpace(n1Str))
+                { results[r, c] = "Error: First property name is empty at this position."; return; }
+            if (!TryGetStringAt(name2, n2Sh, r, c, out string n2Str) || string.IsNullOrWhiteSpace(n2Str))
+                { results[r, c] = "Error: Second property name is empty at this position."; return; }
+            if (!TryGetStringAt(name3, n3Sh, r, c, out string n3Str) || string.IsNullOrWhiteSpace(n3Str))
+                { results[r, c] = "Error: Third property name is empty at this position."; return; }
 
-            int n = Math.Max(Math.Max(values1.Length, values2.Length), values3.Length);
-            if ((isValue1Array && values1.Length != n && values1.Length > 1) ||
-                (isValue2Array && values2.Length != n && values2.Length > 1) ||
-                (isValue3Array && values3.Length != n && values3.Length > 1))
+            outStr = FormatName_HA(outStr);
+            n1Str  = FormatName_HA(n1Str);
+            n2Str  = FormatName_HA(n2Str);
+            n3Str  = FormatName_HA(n3Str);
+
+            if (!TryGetDoubleAt(value1, v1Sh, r, c, out double v1)) { results[r, c] = "Error: value1 is not a number at this position."; return; }
+            if (!TryGetDoubleAt(value2, v2Sh, r, c, out double v2)) { results[r, c] = "Error: value2 is not a number at this position."; return; }
+            if (!TryGetDoubleAt(value3, v3Sh, r, c, out double v3)) { results[r, c] = "Error: value3 is not a number at this position."; return; }
+
+            double v1SI = ConvertToSI_HA(n1Str, v1);
+            double v2SI = ConvertToSI_HA(n2Str, v2);
+            double v3SI = ConvertToSI_HA(n3Str, v3);
+
+            try
             {
-                return $"Error: All array inputs must have the same length. Lengths: value1={values1.Length}, value2={values2.Length}, value3={values3.Length}";
+                double rv = CachedHAPropsSI(outStr, n1Str, v1SI, n2Str, v2SI, n3Str, v3SI);
+                results[r, c] = (double.IsNaN(rv) || rv >= 1.0E+308 || rv <= -1.0E+308)
+                    ? (object)$"Error: CoolProp failed: {GetCoolPropError()}"
+                    : ConvertFromSI_HA(outStr, rv);
             }
+            catch (Exception ex) { results[r, c] = $"Error: {ex.Message}"; }
+        };
 
-            var results = new double[n];
-            var errors = new string[n];
+        if (total >= ParallelThreshold) Parallel.For(0, total, compute);
+        else for (int i = 0; i < total; i++) compute(i);
 
-            Action<int> compute = i =>
-            {
-                double v1SI = ConvertToSI_HA(name1, values1[isValue1Array ? Math.Min(i, values1.Length - 1) : 0]);
-                double v2SI = ConvertToSI_HA(name2, values2[isValue2Array ? Math.Min(i, values2.Length - 1) : 0]);
-                double v3SI = ConvertToSI_HA(name3, values3[isValue3Array ? Math.Min(i, values3.Length - 1) : 0]);
-                try
-                {
-                    double r = CachedHAPropsSI(output, name1, v1SI, name2, v2SI, name3, v3SI);
-                    if (double.IsNaN(r) || r >= 1.0E+308 || r <= -1.0E+308)
-                        errors[i] = $"Error at index {i}: CoolProp failed to compute property. {GetCoolPropError()}";
-                    else
-                        results[i] = ConvertFromSI_HA(output, r);
-                }
-                catch (Exception ex) { errors[i] = $"Error at index {i}: {ex.Message}"; }
-            };
-
-            if (n >= ParallelThreshold)
-                Parallel.For(0, n, compute);
-            else
-                for (int i = 0; i < n; i++) compute(i);
-
-            for (int i = 0; i < n; i++)
-                if (errors[i] != null) { LogDebug($"HAProps array: {errors[i]}"); return errors[i]; }
-
-            return BuildOutputArray(results, n,
-                isValue1Array, value1,
-                isValue2Array || isValue3Array, isValue2Array ? value2 : value3);
-        }
-        catch (InvalidCastException ex) { return $"Error: {ex.Message}"; }
-        catch (ArgumentException ex) { return $"Error: {ex.Message}"; }
-        catch (Exception ex) { return $"Error processing array inputs: {ex.Message}"; }
+        return results;
     }
 
     [ExcelFunction(Name = "TMPa", Description = "Calculate thermodynamic properties of humid air using CoolProp with engineering units (°C, bar, kJ/kg, etc.). Alias for HAProps.")]
-    public static object TMPa(string output, string name1, object value1, string name2, object value2, string name3, object value3)
+    public static object TMPa(object output, object name1, object value1, object name2, object value2, object name3, object value3)
     {
         return HAProps(output, name1, value1, name2, value2, name3, value3);
     }

@@ -110,4 +110,27 @@ public static partial class CoolPropWrapper
             return $"Error listing fluid aliases: {ex.Message}";
         }
     }
+
+    [ExcelFunction(Name = "CP_ListHAPropertyAliases",
+        Description = "Returns a spilled two-column array of all accepted humid air property name aliases and their canonical CoolProp names, for HAProps/HAPropsSI.")]
+    public static object CP_ListHAPropertyAliases()
+    {
+        try
+        {
+            var pairs = HumidAirPropertyMap
+                .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            object[,] result = new object[pairs.Length, 2];
+            for (int i = 0; i < pairs.Length; i++)
+            {
+                result[i, 0] = pairs[i].Key;
+                result[i, 1] = pairs[i].Value;
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            return $"Error listing HA property aliases: {ex.Message}";
+        }
+    }
 }
