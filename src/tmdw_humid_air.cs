@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using ExcelDna.Integration;
 
 public static partial class CoolPropWrapper
@@ -99,8 +98,8 @@ public static partial class CoolPropWrapper
             catch (Exception ex) { results[r, c] = $"Error: {ex.Message}"; }
         };
 
-        if (total >= ParallelThreshold) Parallel.For(0, total, compute);
-        else for (int i = 0; i < total; i++) compute(i);
+        // HAPropsSI is not thread-safe under concurrent calls; always evaluate sequentially.
+        for (int i = 0; i < total; i++) compute(i);
 
         return results;
     }
@@ -208,8 +207,7 @@ public static partial class CoolPropWrapper
             catch (Exception ex) { results[r, c] = $"Error: {ex.Message}"; }
         };
 
-        if (total >= ParallelThreshold) Parallel.For(0, total, compute);
-        else for (int i = 0; i < total; i++) compute(i);
+        for (int i = 0; i < total; i++) compute(i);
 
         return results;
     }
