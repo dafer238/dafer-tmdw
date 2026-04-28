@@ -58,7 +58,7 @@ public static partial class CoolPropWrapper
 
             if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
             {
-                string err = GetCoolPropError();
+                string err = ConsumeLastError();
                 LogDebug($"HAPropsSI invalid result ({outStr}): {err}");
                 return $"Error: CoolProp failed to compute property. {err}";
             }
@@ -93,7 +93,7 @@ public static partial class CoolPropWrapper
             {
                 double rv = CachedHAPropsSI(outStr, n1Str, v1, n2Str, v2, n3Str, v3);
                 results[r, c] = (double.IsNaN(rv) || rv >= 1.0E+308 || rv <= -1.0E+308)
-                    ? (object)$"Error: CoolProp failed: {GetCoolPropError()}"
+                    ? (object)$"Error: CoolProp failed: {ConsumeLastError()}"
                     : rv;
             }
             catch (Exception ex) { results[r, c] = $"Error: {ex.Message}"; }
@@ -163,7 +163,7 @@ public static partial class CoolPropWrapper
 
             if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
             {
-                string err = GetCoolPropError();
+                string err = ConsumeLastError();
                 LogDebug($"HAProps invalid result ({outStr}): {err}");
                 return $"Error: CoolProp failed to compute property. {err}";
             }
@@ -202,7 +202,7 @@ public static partial class CoolPropWrapper
             {
                 double rv = CachedHAPropsSI(outStr, n1Str, v1SI, n2Str, v2SI, n3Str, v3SI);
                 results[r, c] = (double.IsNaN(rv) || rv >= 1.0E+308 || rv <= -1.0E+308)
-                    ? (object)$"Error: CoolProp failed: {GetCoolPropError()}"
+                    ? (object)$"Error: CoolProp failed: {ConsumeLastError()}"
                     : ConvertFromSI_HA(outStr, rv);
             }
             catch (Exception ex) { results[r, c] = $"Error: {ex.Message}"; }

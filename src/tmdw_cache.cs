@@ -12,6 +12,19 @@ public static partial class CoolPropWrapper
     private static int _cacheHits = 0;
     private static int _cacheMisses = 0;
 
+    // Thread-local error capture: captured immediately after a failed native call so that
+    // a parallel CoolProp call on another thread cannot overwrite the global error string
+    // before this thread reads it.
+    [ThreadStatic]
+    private static string _threadLastError;
+
+    internal static string ConsumeLastError()
+    {
+        string e = _threadLastError;
+        _threadLastError = null;
+        return e ?? GetCoolPropError();
+    }
+
     // Minimum array length that gets dispatched to the thread pool for parallel evaluation.
     internal const int ParallelThreshold = 4;
 
@@ -34,6 +47,10 @@ public static partial class CoolPropWrapper
             _propCache.TryAdd(key, result);
             Interlocked.Increment(ref _cacheMisses);
         }
+        else
+        {
+            _threadLastError = GetCoolPropError();
+        }
         return result;
     }
 
@@ -53,6 +70,10 @@ public static partial class CoolPropWrapper
         {
             _propCache.TryAdd(key, result);
             Interlocked.Increment(ref _cacheMisses);
+        }
+        else
+        {
+            _threadLastError = GetCoolPropError();
         }
         return result;
     }

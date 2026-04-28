@@ -29,6 +29,8 @@ public static partial class CoolPropWrapper
             if (!TryGetStringAt(fluid, flSh, 0, 0, out string flStr) || string.IsNullOrWhiteSpace(flStr))
                 return "Error: Fluid name is missing or not a string.";
 
+            if (flStr.StartsWith("Error:", StringComparison.OrdinalIgnoreCase)) return flStr;
+
             outStr = FormatName(outStr);
             n1Str  = FormatName(n1Str);
             n2Str  = FormatName(n2Str);
@@ -57,7 +59,7 @@ public static partial class CoolPropWrapper
 
             if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
             {
-                string err = GetCoolPropError();
+                string err = ConsumeLastError();
                 LogDebug($"PropsSI invalid result ({outStr}): {err}");
                 return $"Error: CoolProp failed to compute property. {err}";
             }
@@ -79,6 +81,9 @@ public static partial class CoolPropWrapper
             if (!TryGetStringAt(fluid, flSh, r, c, out string flStr) || string.IsNullOrWhiteSpace(flStr))
                 { results[r, c] = "Error: Fluid name is empty at this position."; return; }
 
+            if (flStr.StartsWith("Error:", StringComparison.OrdinalIgnoreCase))
+                { results[r, c] = flStr; return; }
+
             outStr = FormatName(outStr);
             n1Str  = FormatName(n1Str);
             n2Str  = FormatName(n2Str);
@@ -91,7 +96,7 @@ public static partial class CoolPropWrapper
             {
                 double rv = CachedPropsSI(outStr, n1Str, v1, n2Str, v2, flStr);
                 results[r, c] = (double.IsNaN(rv) || rv >= 1.0E+308 || rv <= -1.0E+308)
-                    ? (object)$"Error: CoolProp failed: {GetCoolPropError()}"
+                    ? (object)$"Error: CoolProp failed: {ConsumeLastError()}"
                     : rv;
             }
             catch (Exception ex) { results[r, c] = $"Error: {ex.Message}"; }
@@ -127,6 +132,8 @@ public static partial class CoolPropWrapper
             if (!TryGetStringAt(fluid, flSh, 0, 0, out string flStr) || string.IsNullOrWhiteSpace(flStr))
                 return "Error: Fluid name is missing or not a string.";
 
+            if (flStr.StartsWith("Error:", StringComparison.OrdinalIgnoreCase)) return flStr;
+
             outStr = FormatName(outStr);
             n1Str  = FormatName(n1Str);
             n2Str  = FormatName(n2Str);
@@ -158,7 +165,7 @@ public static partial class CoolPropWrapper
 
             if (double.IsNaN(result) || result >= 1.0E+308 || result <= -1.0E+308)
             {
-                string err = GetCoolPropError();
+                string err = ConsumeLastError();
                 LogDebug($"Props invalid result ({outStr}): {err}");
                 return $"Error: CoolProp failed to compute property. {err}";
             }
@@ -180,6 +187,9 @@ public static partial class CoolPropWrapper
             if (!TryGetStringAt(fluid, flSh, r, c, out string flStr) || string.IsNullOrWhiteSpace(flStr))
                 { results[r, c] = "Error: Fluid name is empty at this position."; return; }
 
+            if (flStr.StartsWith("Error:", StringComparison.OrdinalIgnoreCase))
+                { results[r, c] = flStr; return; }
+
             outStr = FormatName(outStr);
             n1Str  = FormatName(n1Str);
             n2Str  = FormatName(n2Str);
@@ -195,7 +205,7 @@ public static partial class CoolPropWrapper
             {
                 double rv = CachedPropsSI(outStr, n1Str, v1SI, n2Str, v2SI, flStr);
                 results[r, c] = (double.IsNaN(rv) || rv >= 1.0E+308 || rv <= -1.0E+308)
-                    ? (object)$"Error: CoolProp failed: {GetCoolPropError()}"
+                    ? (object)$"Error: CoolProp failed: {ConsumeLastError()}"
                     : ConvertFromSI(outStr, rv);
             }
             catch (Exception ex) { results[r, c] = $"Error: {ex.Message}"; }

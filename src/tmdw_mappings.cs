@@ -208,7 +208,7 @@ public static partial class CoolPropWrapper
         HumidAirPropertyMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["B"] = "Twb", ["TWB"] = "Twb", ["T_WB"] = "Twb", ["WETBULB"] = "Twb", ["WETBULBTEMP"] = "Twb", ["WETBULBTEMPERATURE"] = "Twb",
-            ["C"] = "Cda", ["CP"] = "Cda", ["CDA"] = "Cda", ["CPDA"] = "Cda", ["CP_DA"] = "Cda",
+            ["C"] = "C", ["CP"] = "C", ["CDA"] = "C", ["CPDA"] = "C", ["CP_DA"] = "C",
             ["CHA"] = "Cha", ["CPHA"] = "Cha", ["CP_HA"] = "Cha",
             ["CV"] = "CV", ["CVMASS"] = "CV",
             ["CVHA"] = "CVha", ["CV_HA"] = "CVha",
@@ -216,8 +216,8 @@ public static partial class CoolPropWrapper
             ["H"] = "Hda", ["HDA"] = "Hda", ["H_DA"] = "Hda", ["ENTHALPY"] = "Hda",
             ["HHA"] = "Hha", ["H_HA"] = "Hha",
             ["K"] = "K", ["CONDUCTIVITY"] = "K", ["THERMALCONDUCTIVITY"] = "K",
-            ["M"] = "MU", ["MU"] = "MU", ["VISC"] = "MU", ["VISCOSITY"] = "MU", ["DYNAMICVISCOSITY"] = "MU",
-            ["PSI_W"] = "Psi_w", ["PSIW"] = "Psi_w", ["Y"] = "Psi_w",
+            ["M"] = "M", ["MU"] = "M", ["VISC"] = "M", ["VISCOSITY"] = "M", ["DYNAMICVISCOSITY"] = "M",
+            ["PSI_W"] = "psi_w", ["PSIW"] = "psi_w", ["Y"] = "psi_w",
             ["P"] = "P", ["PRESSURE"] = "P", ["PRES"] = "P",
             ["P_W"] = "P_w", ["PW"] = "P_w", ["PARTIALPRESSURE"] = "P_w", ["WATERPRESSURE"] = "P_w",
             ["R"] = "R", ["RH"] = "R", ["RELHUM"] = "R", ["RELATIVEHUMIDITY"] = "R",
@@ -247,7 +247,7 @@ public static partial class CoolPropWrapper
         {
             "H", "Hmolar", "U", "Umolar", "S", "Smolar", "Smolar_residual",
             "Cpmass", "Cvmass", "Cpmolar", "Cvmolar", "Cp0mass", "Cp0molar",
-            "G", "Gmolar", "Hda", "Hha", "Sda", "Sha", "Cda", "Cha"
+            "G", "Gmolar", "Hda", "Hha", "Sda", "Sha", "C", "Cha"
         };
     }
 }
